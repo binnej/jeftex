@@ -38,14 +38,15 @@ Click a button to insert its LaTeX into the text box. If you have text selected,
 
 ## Installation
 
-1. Host `taskpane.html` at an HTTPS address. In this project that is GitHub Pages: `https://binnej.github.io/jeftex/taskpane.html`.
-2. In `manifest.xml`, set the `SourceLocation` and the `bt:Url` entries to that address.
-3. Load the manifest in Word:
+1. Load the manifest in Word:
    - **Windows**: Insert > Add-ins > My Add-ins > Shared Folder (or "Upload My Add-in").
    - **Mac**: Insert > Add-ins > My Add-ins > Upload My Add-in.
-4. Open the add-in from the Home tab.
+2. Open the add-in from the Home tab.
+3. The plug-in's website is currently hosted on github as a github page.
 
-## Versioning and cache
+Tip: if installation does not work, ask Claude Ai for help. 
+
+## Want to make your own version? 
 
 Word caches add-ins. To see a new version:
 
