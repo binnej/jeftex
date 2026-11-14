@@ -1,4 +1,6 @@
-# TeX Equations: LaTeX and MathType add-in for Word
+<img src="logo_big.png" height="100">
+
+LaTeX and MathType add-in for Word
 
 This is a vibe coded word plug-in that generates LaTeX equations in word.
 - Generated equations can be edited again.
