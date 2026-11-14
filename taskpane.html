@@ -26,7 +26,7 @@ small{opacity:.6}
 <div id="tabs"></div><div id="pal"></div>
 <textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
 <div id="prev"></div>
-<button id="ins">Insert</button><button id="upd" disabled>Update selected</button><button id="insmt">Insert as MathType</button>
+<button id="ins">Insert</button><button id="insmt">Insert as MathType</button>
 <hr>
 <b>MathType &rarr; LaTeX</b><br><small>MathType objects become editable plugin equations</small><br>
 <button id="cs">Selection</button><button id="ca">Whole document</button>
@@ -34,7 +34,7 @@ small{opacity:.6}
 <b>LaTeX &rarr; MathType</b><br><small>Plugin equations become MathType objects</small><br>
 <button id="ts">Selection</button><button id="ta">Whole document</button>
 <p id="msg"></p>
-<small>build 3</small>
+<small>build 5</small>
 <script>
 const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -50,14 +50,25 @@ function toPng(svg,w,h){return new Promise((ok,no)=>{const i=new Image();
   c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/png').split(',')[1]);};
  i.onerror=()=>no(new Error('PNG fallback failed'));
  i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);});}
+/* Fractions/binomials always in display style, so nested fractions keep full size.
+   The stored TeX (alt text) is left untouched; only the rendering is adjusted. */
+const PAD=3,norm=t=>t.replace(/\\(?:frac|tfrac)(?![a-zA-Z])/g,'\\dfrac').replace(/\\binom(?![a-zA-Z])/g,'\\dbinom');
 async function render(tex){
- const n=await MathJax.tex2svgPromise(tex,{display:false}),s=n.querySelector('svg');
+ const n=await MathJax.tex2svgPromise(norm(tex),{display:false}),s=n.querySelector('svg');
  if(s.querySelector('[data-mml-node="merror"]'))throw new Error('Invalid LaTeX');
- const w=Math.round(parseFloat(s.getAttribute('width'))*EX),h=Math.round(parseFloat(s.getAttribute('height'))*EX),
-  va=parseFloat(s.style.verticalAlign)||0;
+ const w0=parseFloat(s.getAttribute('width'))*EX,h0=parseFloat(s.getAttribute('height'))*EX,
+  va=parseFloat(s.style.verticalAlign)||0,vb=s.getAttribute('viewBox').split(/[\s,]+/).map(Number),
+  pu=PAD*vb[2]/w0,box=[vb[0]-pu,vb[1]-pu,vb[2]+2*pu,vb[3]+2*pu],
+  w=Math.round(w0)+2*PAD,h=Math.round(h0)+2*PAD;
+ /* near-invisible background box: makes the whole rectangle clickable in Word */
+ s.setAttribute('viewBox',box.join(' '));
+ const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+ bg.setAttribute('x',box[0]);bg.setAttribute('y',box[1]);bg.setAttribute('width',box[2]);bg.setAttribute('height',box[3]);
+ bg.setAttribute('fill','#ffffff');bg.setAttribute('fill-opacity','0.01');
+ s.insertBefore(bg,s.firstChild);
  s.setAttribute('width',w+'px');s.setAttribute('height',h+'px');s.removeAttribute('style');
  const svg=new XMLSerializer().serializeToString(s).replace(/currentColor/g,'#000000');
- return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round(va*EX*1.5)};
+ return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round((va*EX-PAD)*1.5)};
 }
 
 /* ---------- OOXML helpers ---------- */
@@ -357,8 +368,8 @@ async function showTab(name){tab=name;
 function buildTabs(){for(const k of Object.keys(PAL)){const b=document.createElement('button');b.className='tb';b.textContent=k;b.onclick=()=>showTab(k);$('tabs').appendChild(b);}showTab(tab);}
 
 /* ---------- UI ---------- */
-let cur=null,tmr;
-async function preview(){try{$('prev').replaceChildren(await MathJax.tex2svgPromise($('tex').value||' '));}catch(e){}}
+let tmr;
+async function preview(){try{$('prev').replaceChildren(await MathJax.tex2svgPromise(norm($('tex').value||' '),{display:false}));}catch(e){}}
 $('tex').oninput=()=>{clearTimeout(tmr);tmr=setTimeout(preview,250);};
 const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
 $('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
@@ -367,8 +378,6 @@ $('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
 $('insmt').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
  const p=pkgMT(await render(t),t);
  await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted as MathType object (double-click it to edit in MathType).');});
-$('upd').onclick=run(async()=>{const t=$('tex').value.trim(),p=pkgFor(await render(t),t);
- await Word.run(async c=>{c.document.getSelection().inlinePictures.getFirst().getRange('Whole').insertOoxml(p,'Replace');await c.sync();});say('Updated.');});
 /* MathType -> LaTeX (plugin equations) */
 $('cs').onclick=run(async()=>{let r;
  await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
@@ -395,8 +404,5 @@ $('ta').onclick=run(async()=>{let tot=0,errs=[];
    const r=await toMathType(ox[k].value);errs.push(...r.errs);
    if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
  say(`Converted ${tot} to MathType. Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
-async function onSel(){try{await Word.run(async c=>{const p=c.document.getSelection().inlinePictures;
- p.load('items/altTextDescription');await c.sync();const a=p.items[0]?.altTextDescription||'';
- cur=a.startsWith('TEX:')?a.slice(4):null;$('upd').disabled=!cur;if(cur){$('tex').value=cur;preview();}});}catch(e){}}
-Office.onReady(()=>{buildTabs();Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
+Office.onReady(()=>{buildTabs();});
 </script></body></html>
