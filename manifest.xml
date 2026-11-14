@@ -6,12 +6,12 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="TeX Equations"/>
   <Description DefaultValue="LaTeX to SVG equations, with MathType conversion"/>
-  <IconUrl DefaultValue="https://localhost:3000/icon.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/icon.png"/>
-  <SupportUrl DefaultValue="https://localhost:3000"/>
-  <AppDomains><AppDomain>https://localhost:3000</AppDomain></AppDomains>
+  <IconUrl DefaultValue="https://binnej.github.io/jeftex/icon.png"/>
+  <HighResolutionIconUrl DefaultValue="https://binnej.github.io/jeftex/icon.png"/>
+  <SupportUrl DefaultValue="https://binnej.github.io/jeftex"/>
+  <AppDomains><AppDomain>https://binnej.github.io/jeftex</AppDomain></AppDomains>
   <Hosts><Host Name="Document"/></Hosts>
-  <DefaultSettings><SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/></DefaultSettings>
+  <DefaultSettings><SourceLocation DefaultValue="https://binnej.github.io/jeftex/taskpane.html"/></DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
@@ -35,8 +35,8 @@
       </Host>
     </Hosts>
     <Resources>
-      <bt:Images><bt:Image id="I" DefaultValue="https://localhost:3000/icon.png"/></bt:Images>
-      <bt:Urls><bt:Url id="U" DefaultValue="https://localhost:3000/taskpane.html"/></bt:Urls>
+      <bt:Images><bt:Image id="I" DefaultValue="https://binnej.github.io/jeftex/icon.png"/></bt:Images>
+      <bt:Urls><bt:Url id="U" DefaultValue="https://binnej.github.io/jeftex/taskpane.html"/></bt:Urls>
       <bt:ShortStrings><bt:String id="L" DefaultValue="TeX Equations"/></bt:ShortStrings>
       <bt:LongStrings><bt:String id="D" DefaultValue="Insert and edit LaTeX equations as SVG, convert MathType equations"/></bt:LongStrings>
     </Resources>
