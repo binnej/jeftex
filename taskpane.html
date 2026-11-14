@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TeX Equations</title>
+<title>JeFTeX</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/cfb@1.2.2/dist/cfb.min.js"></script>
 <script>window.MathJax={svg:{fontCache:'none'},startup:{typeset:false}};</script>
@@ -22,7 +22,9 @@ button.p svg{max-width:130px;height:auto}
 #prev{min-height:48px;border:1px dashed var(--bd);margin:8px 0;padding:8px;overflow-x:auto}
 #msg{font-size:12px;white-space:pre-wrap}hr{border:0;border-top:1px solid var(--bd);margin:12px 0}
 small{opacity:.6}
+#hd{margin-bottom:10px}#hd img{display:block;max-height:64px;height:auto;width:auto;max-width:100%}
 </style></head><body>
+<div id="hd"><img src="logo_big.png?v=9" alt="JeFTeX"></div>
 <div id="tabs"></div><div id="pal"></div>
 <textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
 <div id="prev"></div>
@@ -34,7 +36,7 @@ small{opacity:.6}
 <b>LaTeX &rarr; MathType</b><br><small>Plugin equations become MathType objects</small><br>
 <button id="ts">Selection</button><button id="ta">Whole document</button>
 <p id="msg"></p>
-<small>build 6</small>
+<small>build 9</small>
 <script>
 const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
