@@ -1,7 +1,6 @@
 # TeX Equations: LaTeX and MathType add-in for Word
 
-A vibe coded Word plug-in task pane that converts equations between LaTeX and MathType, with a menu bar of commonly used math constructs.
-As this is vibe coded, use at your own risks. My tests are ok thus far. 
+A Word task pane that converts equations between LaTeX and MathType, with a menu bar of commonly used math constructs.
 
 ## Features
 
@@ -33,6 +32,11 @@ Six tabs, each with a grid of buttons showing a rendered preview:
 
 Click a button to insert its LaTeX into the text box. If you have text selected, it is placed where `§` appears in the template.
 
+### Rendering
+- Fractions (and binomials) are always rendered at full size, so nested fractions do not shrink. The equation simply becomes larger. Sub- and superscripts remain smaller, as is standard. The LaTeX stored in the equation is not changed, so conversion to MathType still sees `\frac`.
+- Each equation picture has a nearly invisible background rectangle with a few pixels of padding, so clicking in the white space around a formula still selects it.
+- Equations inserted before build 4 keep their old look. Select one and press **Update selected** to re-render it.
+
 ## Installation
 
 1. Host `taskpane.html` at an HTTPS address. In this project that is GitHub Pages: `https://binnej.github.io/jeftex/taskpane.html`.
@@ -53,7 +57,7 @@ Word caches add-ins. To see a new version:
    - **Mac**: the `Wef` folder under `~/Library/Containers/com.microsoft.Word/`
 4. Reopen Word.
 
-The current build appears at the bottom of the pane ("build 3"), so you can see which version is running.
+The current build appears at the bottom of the pane ("build 4"), so you can see which version is running.
 
 ## Requirements
 
