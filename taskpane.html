@@ -6,22 +6,35 @@
 <script>window.MathJax={svg:{fontCache:'none'},startup:{typeset:false}};</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
 <style>
-:root{--bg:#fff;--fg:#1b1b1b;--ac:#1f5fbf;--bd:#c8c8c8}
-@media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--fg:#eee;--ac:#5b9bff;--bd:#555}}
+:root{--bg:#fff;--fg:#1b1b1b;--ac:#1f5fbf;--bd:#c8c8c8;--hv:#e8f0fc}
+@media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--fg:#eee;--ac:#5b9bff;--bd:#555;--hv:#2c3a52}}
 body{font:14px system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:12px}
 textarea{width:100%;box-sizing:border-box;font:13px ui-monospace,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--bd);padding:6px}
 button{background:var(--ac);color:#fff;border:0;padding:8px 12px;margin:4px 4px 0 0;cursor:pointer}
 button:disabled{opacity:.4;cursor:default}
+#tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--bd);margin-bottom:6px}
+button.tb{background:transparent;color:var(--fg);padding:5px 8px;margin:0;border-bottom:2px solid transparent;font-size:12px}
+button.tb.on{border-bottom-color:var(--ac);color:var(--ac);font-weight:600}
+.grid{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+button.p{background:transparent;color:var(--fg);border:1px solid var(--bd);padding:2px 6px;margin:0;min-width:34px;min-height:30px;font-size:15px;display:flex;align-items:center;justify-content:center}
+button.p:hover{background:var(--hv);border-color:var(--ac)}
+button.p svg{max-width:130px;height:auto}
 #prev{min-height:48px;border:1px dashed var(--bd);margin:8px 0;padding:8px;overflow-x:auto}
 #msg{font-size:12px;white-space:pre-wrap}hr{border:0;border-top:1px solid var(--bd);margin:12px 0}
+small{opacity:.6}
 </style></head><body>
+<div id="tabs"></div><div id="pal"></div>
 <textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
 <div id="prev"></div>
-<button id="ins">Insert</button><button id="upd" disabled>Update selected</button>
+<button id="ins">Insert</button><button id="upd" disabled>Update selected</button><button id="insmt">Insert as MathType</button>
 <hr>
-<b>MathType</b><br>
-<button id="cs">Convert selection</button><button id="ca">Convert whole document</button>
+<b>MathType &rarr; LaTeX</b><br><small>MathType objects become editable plugin equations</small><br>
+<button id="cs">Selection</button><button id="ca">Whole document</button>
+<hr>
+<b>LaTeX &rarr; MathType</b><br><small>Plugin equations become MathType objects</small><br>
+<button id="ts">Selection</button><button id="ta">Whole document</button>
 <p id="msg"></p>
+<small>build 3</small>
 <script>
 const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -62,16 +75,16 @@ function pkgFor(r,tex){
   +part('/word/media/eqx.png','image/png',r.png,1)+part('/word/media/eqx.svg','image/svg+xml',b64(r.svg),1)+'</pkg:package>';}
 
 /* ---------- MTEF v5 (MathType binary) -> LaTeX, best effort ---------- */
-const G=['alpha','beta','gamma','delta','epsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','o','pi','rho','varsigma','sigma','tau','upsilon','phi','chi','psi','omega'],
+const G=['alpha','beta','gamma','delta','varepsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','o','pi','rho','varsigma','sigma','tau','upsilon','varphi','chi','psi','omega'],
 GU=['A','B','\\Gamma','\\Delta','E','Z','H','\\Theta','I','K','\\Lambda','M','N','\\Xi','O','\\Pi','P','','\\Sigma','T','\\Upsilon','\\Phi','X','\\Psi','\\Omega'],
-SYM={0xb1:'\\pm',0xd7:'\\times',0xf7:'\\div',0x2264:'\\le',0x2265:'\\ge',0x2260:'\\ne',0x2248:'\\approx',0x221e:'\\infty',0x2192:'\\to',0x2190:'\\leftarrow',0x21d2:'\\Rightarrow',0x2211:'\\sum',0x220f:'\\prod',0x222b:'\\int',0x2202:'\\partial',0x2212:'-',0x22c5:'\\cdot',0x2026:'\\ldots',0x2208:'\\in',0x2207:'\\nabla',0x2200:'\\forall',0x2203:'\\exists',0x222a:'\\cup',0x2229:'\\cap',0x2218:'\\circ',0xb0:'^\\circ',0x2032:"'",0x221a:'\\surd'},
+SYM={0xb1:'\\pm',0xd7:'\\times',0xf7:'\\div',0x2264:'\\le',0x2265:'\\ge',0x2260:'\\ne',0x2248:'\\approx',0x221e:'\\infty',0x2192:'\\to',0x2190:'\\leftarrow',0x21d2:'\\Rightarrow',0x2211:'\\sum',0x220f:'\\prod',0x222b:'\\int',0x2202:'\\partial',0x2212:'-',0x22c5:'\\cdot',0x2026:'\\ldots',0x2208:'\\in',0x2207:'\\nabla',0x2200:'\\forall',0x2203:'\\exists',0x222a:'\\cup',0x2229:'\\cap',0x2218:'\\circ',0x3d5:'\\phi',0x2261:'\\equiv',0x221d:'\\propto',0x2282:'\\subset',0x21d4:'\\Leftrightarrow',0xb0:'^\\circ',0x2032:"'",0x221a:'\\surd'},
 ESC={9:'\\qquad ',123:'\\{',125:'\\}',92:'\\backslash',95:'\\_',94:'\\^{}',37:'\\%',38:'\\&',35:'\\#',36:'\\$',126:'\\sim'};
 function ch(c){let r;
  if(c>=0x3b1&&c<=0x3c9)r=G[c-0x3b1]==='o'?'o':'\\'+G[c-0x3b1];
  else if(c>=0x391&&c<=0x3a9&&GU[c-0x391])r=GU[c-0x391];
  else r=SYM[c]||ESC[c]||String.fromCodePoint(c||63);
  return /^\\[a-zA-Z]+$/.test(r)?r+' ':r;}
-const EMB={2:'dot',3:'ddot',4:'dddot',9:'tilde',10:'hat',12:'vec',17:'bar',18:'bar'};
+const EMB={2:'dot',3:'ddot',4:'dddot',8:'tilde',9:'hat',11:'vec',16:'bar',17:'bar'};
 function tmpl(s,v,c){const g=n=>c[n]||'',
  FEN={0:['\\langle','\\rangle'],1:['(',')'],2:['\\{','\\}'],3:['[',']'],4:['|','|'],5:['\\|','\\|'],6:['\\lfloor','\\rfloor'],7:['\\lceil','\\rceil'],8:['[',')'],9:['(',']']},
  OP={15:'\\int',16:'\\sum',17:'\\prod',18:'\\coprod',19:'\\bigcup',20:'\\bigcap'};
@@ -165,6 +178,184 @@ async function convertOoxml(x){
  return{xml:new XMLSerializer().serializeToString(d),n,errs};
 }
 
+/* ---------- LaTeX -> MTEF v5 (MathType binary), subset ---------- */
+const GRK={alpha:[0x3b1,'a'],beta:[0x3b2,'b'],gamma:[0x3b3,'g'],delta:[0x3b4,'d'],epsilon:[0x3b5,'e'],varepsilon:[0x3b5,'e'],zeta:[0x3b6,'z'],eta:[0x3b7,'h'],theta:[0x3b8,'q'],vartheta:[0x3d1,'J'],iota:[0x3b9,'i'],kappa:[0x3ba,'k'],lambda:[0x3bb,'l'],mu:[0x3bc,'m'],nu:[0x3bd,'n'],xi:[0x3be,'x'],pi:[0x3c0,'p'],rho:[0x3c1,'r'],sigma:[0x3c3,'s'],varsigma:[0x3c2,'V'],tau:[0x3c4,'t'],upsilon:[0x3c5,'u'],varphi:[0x3c6,'f'],phi:[0x3d5,'j'],chi:[0x3c7,'c'],psi:[0x3c8,'y'],omega:[0x3c9,'w']},
+GRU={Gamma:[0x393,'G'],Delta:[0x394,'D'],Theta:[0x398,'Q'],Lambda:[0x39b,'L'],Xi:[0x39e,'X'],Pi:[0x3a0,'P'],Sigma:[0x3a3,'S'],Upsilon:[0x3a5,'U'],Phi:[0x3a6,'F'],Psi:[0x3a8,'Y'],Omega:[0x3a9,'W']},
+SYT={pm:[0xb1,0xb1],times:[0xd7,0xb4],div:[0xf7,0xb8],cdot:[0x22c5,0xd7],le:[0x2264,0xa3],leq:[0x2264,0xa3],ge:[0x2265,0xb3],geq:[0x2265,0xb3],ne:[0x2260,0xb9],neq:[0x2260,0xb9],approx:[0x2248,0xbb],equiv:[0x2261,0xba],propto:[0x221d,0xb5],infty:[0x221e,0xa5],in:[0x2208,0xce],subset:[0x2282,0xcc],cup:[0x222a,0xc8],cap:[0x2229,0xc7],to:[0x2192,0xae],rightarrow:[0x2192,0xae],leftarrow:[0x2190,0xac],Rightarrow:[0x21d2,0xde],Leftrightarrow:[0x21d4,0xdb],partial:[0x2202,0xb6],nabla:[0x2207,0xd1],forall:[0x2200,0x22],exists:[0x2203,0x24],sim:[0x223c,0x7e],ldots:[0x2026,0xbc],circ:[0x2218,null],sum:[0x2211,0xe5],prod:[0x220f,0xd5],int:[0x222b,0xf2]},
+FNS='sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh log ln lg exp lim max min sup inf det dim gcd mod'.split(' '),
+FD={'(':[1,0x28,0x28],')':[1,0x29,0x29],'[':[3,0x5b,0x5b],']':[3,0x5d,0x5d],'\\{':[2,0x7b,0x7b],'\\}':[2,0x7d,0x7d],'|':[4,0x7c,0x7c],'\\|':[5,0x2016,null],'\\langle':[0,0x2329,0xe1],'\\rangle':[0,0x232a,0xf1],'\\lfloor':[6,0x230a,null],'\\rfloor':[6,0x230b,null],'\\lceil':[7,0x2308,null],'\\rceil':[7,0x2309,null]},
+ACC={vec:11,hat:9,widehat:9,tilde:8,widetilde:8,bar:17,dot:2,ddot:3};
+function texToMtef(src,HEAD){
+ const T=[];
+ for(let i=0;i<src.length;){const c=src[i];
+  if(c==='\\'){let j=i+1;if(/[a-zA-Z]/.test(src[j]||''))while(/[a-zA-Z]/.test(src[j]||''))j++;else j++;T.push(src.slice(i,j));i=j;}
+  else if(/\s/.test(c)){while(/\s/.test(src[i]||'')&&i<src.length)i++;T.push(' ');}
+  else{T.push(c);i++;}}
+ let p=0;const peek=()=>{while(T[p]===' ')p++;return T[p];},next=()=>{const t=peek();p++;return t;};
+ const bad=t=>{throw new Error('Not supported for MathType: '+t);};
+ function seq(stop){const a=[];for(;;){const t=peek();if(t===undefined||stop(t))break;a.push(atom());}return a;}
+ function closeBrace(){if(next()!=='}')throw new Error('Missing }');}
+ function arg(){const t=peek();if(t==='{'){p++;const a=seq(x=>x==='}');closeBrace();return a;}if(t===undefined)throw new Error('Missing argument');return[base()];}
+ function raw(){if(peek()!=='{')throw new Error('Expected {');p++;let d=1,s='';
+  for(;;){const t=T[p++];if(t===undefined)throw new Error('Missing }');
+   if(t==='{')d++;else if(t==='}'){if(!--d)break;}
+   if(t[0]==='\\'&&t!=='\\ ')bad(t);s+=t==='\\ '?' ':t;}return s;}
+ function atom(){const t=peek();let b=(t==='^'||t==='_')?{k:'e'}:base(),sub=null,sup=null;
+  for(;;){const s=peek();if(s==='_'){p++;sub=arg();}else if(s==='^'){p++;sup=arg();}else break;}
+  return sub||sup?{k:'ss',b,sub,sup}:b;}
+ function delim(){const t=next();if(t==='.')return null;const m={'\\lvert':'|','\\rvert':'|','\\vert':'|'}[t]||t;if(!FD[m])bad(t||'delimiter');return m;}
+ function base(){const t=next();
+  if(t==='{'){const a=seq(x=>x==='}');closeBrace();return{k:'g',a};}
+  if(t==='}')throw new Error('Unbalanced }');
+  if(t[0]!=='\\')return{k:'c',c:t};
+  const n=t.slice(1);
+  if(GRK[n])return{k:'s',tf:4,mt:GRK[n][0],c8:GRK[n][1].charCodeAt(0)};
+  if(GRU[n])return{k:'s',tf:5,mt:GRU[n][0],c8:GRU[n][1].charCodeAt(0)};
+  if(SYT[n])return{k:'s',tf:6,mt:SYT[n][0],c8:SYT[n][1]};
+  if(FNS.includes(n))return{k:'fn',s:n};
+  switch(n){
+   case'frac':case'dfrac':case'tfrac':{const a=arg(),b=arg();return{k:'frac',n:a,d:b};}
+   case'sqrt':{let i=null;if(peek()==='['){p++;i=seq(x=>x===']');next();}return{k:'sqrt',i,a:arg()};}
+   case'left':{const l=delim(),a=seq(x=>x==='\\right');if(next()!=='\\right')throw new Error('Missing \\right');return{k:'fence',l,r:delim(),a};}
+   case'begin':{const env=raw();if(!/^[pbBv]?matrix$/.test(env))bad('\\begin{'+env+'}');
+    const rows=[[]];let cell=[];
+    for(;;){const a=seq(x=>x==='&'||x==='\\\\'||x==='\\end');const t=peek();rows[rows.length-1].push(a);
+     if(t==='&'){p++;}else if(t==='\\\\'){p++;rows.push([]);}else break;}
+    if(next()!=='\\end')throw new Error('Missing \\end');raw();
+    if(!rows[rows.length-1].some(c=>c.length)&&rows.length>1&&rows[rows.length-1].length===1)rows.pop();
+    return{k:'mat',env:env.replace('matrix',''),rows};}
+   case'text':case'textrm':case'mbox':return{k:'txt',tf:1,s:raw()};
+   case'mathrm':case'operatorname':return{k:'txt',tf:2,s:raw().replace(/ /g,'')};
+   case'mathbf':case'boldsymbol':case'bf':return{k:'txt',tf:7,s:raw().replace(/ /g,'')};
+   case'mathit':return{k:'g',a:arg()};
+   case'overline':return{k:'bar',o:1,a:arg()};case'underline':return{k:'bar',o:0,a:arg()};
+   case'quad':case'qquad':return{k:'tab'};
+   case',':case';':case':':case'!':case' ':case'limits':case'nolimits':case'displaystyle':case'textstyle':case'scriptstyle':return{k:'e'};
+   case'{':case'}':case'%':case'&':case'#':case'$':case'_':return{k:'c',c:n};
+   case'backslash':return{k:'c',c:'\\'};
+  }
+  if(ACC[n])return{k:'acc',e:ACC[n],a:arg()};
+  return bad(t);}
+ const ast=seq(()=>false);
+ /* emitter */
+ const out=[];let cur=-1,L=0,F=0;
+ const B=(...a)=>{for(const x of a)out.push(x);},need=()=>{if(cur!==L){B(10+L);cur=L;}};
+ function ch(tf,mt,c8,emb){need();B(2,(c8!=null?4:0)|(emb&&emb.length?1:0),128+tf,mt&255,mt>>8);if(c8!=null)B(c8);if(emb&&emb.length){for(const e of emb)B(6,0,e);B(0);}}
+ function plain(c,emb){const cp=c.codePointAt(0);if(cp>0xffff)bad(c);
+  if(/[a-zA-Z]/.test(c))ch(F||3,cp,null,emb);else if(/[0-9]/.test(c))ch(F||8,cp,null,emb);
+  else if('+=<>'.includes(c))ch(6,cp,cp,emb);else if(c==='-')ch(6,0x2212,0x2d,emb);
+  else if(c==='*')ch(6,0x2217,0x2a,emb);else if(c==="'")ch(6,0x2032,0xa2,emb);else ch(8,cp,null,emb);}
+ const sub1=()=>Math.min(L+1,2);
+ function line(a,lv){const q=L;L=lv;need();B(1,0);items(a);B(0);L=q;}
+ function nul(lv){const q=L;L=lv;need();B(1,1);L=q;}
+ function tm(sel,v,f){need();B(3,0,sel,v,0);f();B(0);}
+ function items(a){for(const n of a)item(n);}
+ function flat(a){const r=[];for(const n of a){if(n.k==='g')r.push(...flat(n.a));else if(n.k!=='e')r.push(n);}return r;}
+ function fence(l,r,body){const a=FD[l],b=FD[r];
+  if((a&&b&&a[0]!==b[0])){if(a)ch(8,a[1],null);body(1);if(b)ch(8,b[1],null);return;}
+  if(!a&&!b){body(1);return;}
+  tm((a||b)[0],(a?1:0)|(b?2:0),()=>{body(0);if(a)ch(6,a[1],a[2]);if(b)ch(6,b[1],b[2]);});}
+ function item(n){switch(n.k){
+  case'e':break;
+  case'g':items(n.a);break;
+  case'c':plain(n.c);break;
+  case's':ch(n.tf,n.mt,n.c8);break;
+  case'tab':ch(23,9,null);break;
+  case'fn':for(const c of n.s)ch(2,c.charCodeAt(0),null);break;
+  case'txt':if(n.tf===1){for(const c of n.s)ch(1,c.codePointAt(0),null);}else{const s=F;F=n.tf;for(const c of n.s)plain(c);F=s;}break;
+  case'ss':{if(n.b.k!=='e')item(n.b);const lv=sub1(),sel=n.sub&&n.sup?29:n.sub?27:28;
+   tm(sel,0,()=>{if(sel!==28)line(n.sub,lv);else nul(lv);if(sel!==27)line(n.sup,lv);else nul(lv);});break;}
+  case'frac':tm(11,0,()=>{line(n.n,L);line(n.d,L);});break;
+  case'sqrt':n.i?tm(10,1,()=>{line(n.a,L);line(n.i,sub1());}):tm(10,0,()=>line(n.a,L));break;
+  case'bar':tm(n.o?13:12,0,()=>line(n.a,L));break;
+  case'acc':{const f=flat(n.a);if(f.length!==1)bad('accent over several symbols');const x=f[0];
+   if(x.k==='c')plain(x.c,[n.e]);else if(x.k==='s')ch(x.tf,x.mt,x.c8,[n.e]);else bad('accent over this symbol');break;}
+  case'fence':fence(n.l,n.r,()=>line(n.a,L));break;
+  case'mat':{const R=n.rows.length,C=Math.max(...n.rows.map(r=>r.length));
+   const mk=()=>{need();B(5,0,1,2,1,R,C);for(let i=Math.ceil((R+1)/4);i--;)B(0);for(let i=Math.ceil((C+1)/4);i--;)B(0);
+    for(const r of n.rows)for(let c=0;c<C;c++)r[c]?line(r[c],L):nul(L);B(0);};
+   const E={p:['(',')'],b:['[',']'],B:['\\{','\\}'],v:['|','|']}[n.env];
+   if(E)fence(E[0],E[1],()=>{need();B(1,0);mk();B(0);});else mk();break;}
+  default:bad(n.k);}}
+ line(ast,0);B(0);
+ const body=Uint8Array.from(out),h=Uint8Array.from(HEAD),res=new Uint8Array(h.length+body.length);
+ res.set(h);res.set(body,h.length);const n=res.length-28;
+ res[8]=n&255;res[9]=n>>8&255;res[10]=n>>16&255;res[11]=n>>24&255;return res;}
+
+/* ---------- LaTeX -> MathType: OLE container + Word markup ---------- */
+const HEAD_B64='HAAAAAIAl8JDAgAAAAAAACRuPQ4NO90AhAFqCwUBAAcLRFNNVDcAARNXaW5BbGxCYXNpY0NvZGVQYWdlcwARBVRhaG9tYQARA1N5bWJvbAARBUNvdXJpZXIgTmV3ABEFVGltZXMgTmV3IFJvbWFuABEETVQgRXh0cmEAEgAIIQ9Fj0QvQVD0EA9HX0FQ8h8eQVD0FQ9BAPRF9CX0j0JfQQD0EA9DX0EA9I9F9CpfSPSPQQD0EA9A9I9Bf0j0EA9BKl9EX0X0X0X0X0EPDAEAAQABAgIAAgACAAEBAQADAAQABQAA',OLE_B64='0M8R4KGxGuEAAAAAAAAAAAAAAAAAAAAAPgADAP7/CQAGAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAEAAAAgAAAAEAAAD+////AAAAAAAAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9////BAAAAP7///8FAAAA/v////7//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////1IAbwBvAHQAIABFAG4AdAByAHkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWAAUA//////////8CAAAAA84CAAAAAADAAAAAAAAARgAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAIADAAAAAAAAAQBPAGwAZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAgH///////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAAAAAAAAABAEMAbwBtAHAATwBiAGoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEgACAQEAAAADAAAA/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAABpAAAAAAAAAAMATwBiAGoASQBuAGYAbwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASAAIB/////wQAAAD/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAYAAAAAAAAA/v///wIAAAD+/////v///wUAAAAGAAAABwAAAAgAAAAJAAAACgAAAAsAAAAMAAAADQAAAP7///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8BAAACCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQD+/wMKAAD/////A84CAAAAAADAAAAAAAAARhYAAABNYXRoVHlwZSA3LjAgRXF1YXRpb24ADAAAAE1hdGhUeXBlIEVGAA8AAABFcXVhdGlvbi5EU01UNAD0ObJxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHAAAAAIAl8JDAgAAAAAAACRuPQ4NO90AhAFqCwUBAAcLRFNNVDcAARNXaW5BbGxCYXNpY0NvZGVQYWdlcwARBVRhaG9tYQARA1N5bWJvbAARBUNvdXJpZXIgTmV3ABEFVGltZXMgTmV3IFJvbWFuABEETVQgRXh0cmEAEgAIIQ9Fj0QvQVD0EA9HX0FQ8h8eQVD0FQ9BAPRF9CX0j0JfQQD0EA9DX0EA9I9F9CpfSPSPQQD0EA9A9I9Bf0j0EA9BKl9EX0X0X0X0X0EPDAEAAQABAgIAAgACAAEBAQADAAQABQAACgEAAgCDVgADABsAAAsBAAIAg2sAAgCDZQACAEUAcQB1AGEAdABpAG8AbgAgAE4AYQB0AGkAdgBlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAIA////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAF8CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAg2cAAgCDZQACAINsAAABAQAKAgSGPQA9AwALAAABAAIAiDEAAAEAAgCIMwAAAAIEhMADcAIAg3IAAwAcAAALAQEBAAIAiDIAAAAKAgCDaAACAJcJAAIAlwkAAgCDVgADABsAAAsBAAIAg3AAAgCDaQACAINyAAIAg2EAAgCDbQACAINpAAIAg2QAAgCDZQAAAQEACgIEhj0APQMACwAAAQACAIgxAAABAAIAiDMAAAACAINBAAMAGwAACwEAAgCDZwACAINyAAIAg28AAgCDbgACAINkAAIAg3YAAgCDbAACAINhAAIAg2sAAAEBAAoCBIbFItcCAINoAAIAlwkAAgCXCQACAINWAAMAGwAACwEAAgCDYgACAINvAAIAg2wAAAEBAAoCBIY9AD0DAAsAAAEAAgCINAAAAQACAIgzAAAAAgSEwANwAgCDcgADABwAAAsBAQEAAgCIMwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',OLE_CT='application/vnd.openxmlformats-officedocument.oleObject';
+const u8=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+function oleFor(m){const c=CFB.read(u8(OLE_B64),{type:'array'}),f=CFB.find(c,'Equation Native');
+ f.content=m;f.size=m.length;return CFB.write(c,{type:'base64'});}
+function objXml(w,h,id,rp,ro){
+ return `<w:object xmlns:w="${W}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="${RT}" w:dxaOrig="${Math.round(w*15)}" w:dyaOrig="${Math.round(h*15)}"><v:shape id="_x0000_i${id}" type="#_x0000_t75" style="width:${(w*.75).toFixed(2)}pt;height:${(h*.75).toFixed(2)}pt" o:ole=""><v:imagedata r:id="${rp}" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i${id}" DrawAspect="Content" ObjectID="_${id}${Math.floor(Math.random()*1e6)}" r:id="${ro}"/></w:object>`;}
+function pkgMT(r,tex){
+ const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),id=Date.now()%1e6,
+ rels=`<Relationships xmlns="${PR}"><Relationship Id="rIdP" Type="${RT}/image" Target="media/eqm.png"/><Relationship Id="rIdO" Type="${RT}/oleObject" Target="embeddings/eqm.bin"/></Relationships>`,
+ run=`<w:r>${r.pos?`<w:rPr><w:position w:val="${r.pos}"/></w:rPr>`:''}${objXml(r.w,r.h,id,'rIdP','rIdO')}</w:r>`;
+ return `<pkg:package xmlns:pkg="${PK}">`
+  +part('/_rels/.rels','application/vnd.openxmlformats-package.relationships+xml',`<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${RT}/officeDocument" Target="word/document.xml"/></Relationships>`)
+  +part('/word/_rels/document.xml.rels','application/vnd.openxmlformats-package.relationships+xml',rels)
+  +part('/word/document.xml','application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',`<w:document xmlns:w="${W}"><w:body><w:p>${run}</w:p></w:body></w:document>`)
+  +part('/word/media/eqm.png','image/png',r.png,1)+part('/word/embeddings/eqm.bin',OLE_CT,ole,1)+'</pkg:package>';}
+/* plugin equations (pictures with TEX: alt text) inside an OOXML package -> MathType objects */
+async function toMathType(x){
+ const d=new DOMParser().parseFromString(x,'application/xml'),P={};
+ for(const p of d.getElementsByTagName('pkg:part'))P[p.getAttribute('pkg:name')]=p;
+ const rel=P['/word/_rels/document.xml.rels'].getElementsByTagName('Relationships')[0];
+ const dps=[...d.getElementsByTagName('wp:docPr')].filter(e=>(e.getAttribute('descr')||'').startsWith('TEX:'));
+ let n=0;const errs=[],id0=Date.now()%1e6;
+ if(!dps.length)errs.push('no plugin equations found in the selection');
+ for(const dp of dps){const tex=dp.getAttribute('descr').slice(4);
+  try{const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),r=await render(tex),k=n;
+   let dr=dp;while(dr&&dr.nodeName!=='w:drawing')dr=dr.parentNode;
+   const ob=d.importNode(new DOMParser().parseFromString(objXml(r.w,r.h,id0+k,'rIdMP'+k,'rIdMO'+k),'application/xml').documentElement,true);
+   dr.parentNode.replaceChild(ob,dr);
+   for(const[idn,ty,tg]of[['rIdMP'+k,'image',`media/eqm${k}.png`],['rIdMO'+k,'oleObject',`embeddings/eqm${k}.bin`]]){
+    const e=d.createElementNS(rel.namespaceURI,'Relationship');
+    e.setAttribute('Id',idn);e.setAttribute('Type',RT+'/'+ty);e.setAttribute('Target',tg);rel.appendChild(e);}
+   const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">`+part(`/word/media/eqm${k}.png`,'image/png',r.png,1)+part(`/word/embeddings/eqm${k}.bin`,OLE_CT,ole,1)+'</pkg:package>','application/xml');
+   for(const c of [...add.documentElement.children])d.documentElement.appendChild(d.importNode(c,true));
+   n++;
+  }catch(e){errs.push(e.message+' ['+tex.slice(0,40)+']');}}
+ return{xml:new XMLSerializer().serializeToString(d),n,errs};}
+
+/* ---------- Symbol palette ---------- */
+const sp=a=>a.map(([l,s,t])=>[l,s+' ',t||s]);
+const PAL={
+'Structures':[
+ ['\\frac{a}{b}','\\frac{§}{}','Fraction'],['x^{n}','^{§}','Superscript'],['x_{n}','_{§}','Subscript'],['x_{n}^{m}','_{§}^{}','Sub- and superscript'],
+ ['\\sqrt{x}','\\sqrt{§}','Square root'],['\\sqrt[n]{x}','\\sqrt[§]{}','nth root'],
+ ['(x)','\\left( § \\right)','Parentheses'],['[x]','\\left[ § \\right]','Brackets'],['\\{x\\}','\\left\\{ § \\right\\}','Braces'],['|x|','\\left| § \\right|','Absolute value'],['\\langle x\\rangle','\\left\\langle § \\right\\rangle','Angle brackets'],
+ ['\\overline{x}','\\overline{§}','Overline'],['\\underline{x}','\\underline{§}','Underline'],['\\vec{x}','\\vec{§}','Vector arrow'],['\\hat{x}','\\hat{§}','Hat'],['\\bar{x}','\\bar{§}','Bar'],['\\dot{x}','\\dot{§}','Dot'],['\\text{ab}','\\text{§}','Text']],
+'Calculus':[
+ ['\\sum_{i}^{n}','\\sum_{§}^{}','Sum'],['\\prod_{i}^{n}','\\prod_{§}^{}','Product'],['\\int_{a}^{b}','\\int_{§}^{}','Integral'],['\\lim_{x\\to 0}','\\lim_{§ \\to }','Limit'],
+ ['\\frac{dy}{dx}','\\frac{d§}{d}','Derivative'],['\\frac{\\partial f}{\\partial x}','\\frac{\\partial §}{\\partial }','Partial derivative'],
+ ...sp([['\\partial','\\partial'],['\\nabla','\\nabla'],['\\infty','\\infty'],['\\to','\\to']])],
+'Matrices':[
+ ['\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}','\\begin{pmatrix} § & \\\\  &  \\end{pmatrix}','2×2 matrix ( )'],
+ ['\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}','\\begin{bmatrix} § & \\\\  &  \\end{bmatrix}','2×2 matrix [ ]'],
+ ['\\begin{vmatrix}a&b\\\\c&d\\end{vmatrix}','\\begin{vmatrix} § & \\\\  &  \\end{vmatrix}','Determinant'],
+ ['\\begin{pmatrix}a&b&c\\\\d&e&f\\\\g&h&i\\end{pmatrix}','\\begin{pmatrix} § &  & \\\\  &  & \\\\  &  &  \\end{pmatrix}','3×3 matrix'],
+ ['\\begin{pmatrix}a\\\\b\\end{pmatrix}','\\begin{pmatrix} § \\\\  \\end{pmatrix}','Column vector']],
+'Greek':sp(['alpha','beta','gamma','delta','varepsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','pi','rho','sigma','tau','upsilon','phi','varphi','chi','psi','omega','Gamma','Delta','Theta','Lambda','Xi','Pi','Sigma','Phi','Psi','Omega'].map(n=>['\\'+n,'\\'+n,n])),
+'Symbols':sp([['\\pm','\\pm'],['\\times','\\times'],['\\div','\\div'],['\\cdot','\\cdot'],['\\le','\\le'],['\\ge','\\ge'],['\\ne','\\ne'],['\\approx','\\approx'],['\\equiv','\\equiv'],['\\propto','\\propto'],['\\sim','\\sim'],
+ ['\\in','\\in'],['\\subset','\\subset'],['\\cup','\\cup'],['\\cap','\\cap'],['\\forall','\\forall'],['\\exists','\\exists'],
+ ['\\leftarrow','\\leftarrow'],['\\rightarrow','\\to'],['\\Rightarrow','\\Rightarrow'],['\\Leftrightarrow','\\Leftrightarrow'],['\\ldots','\\ldots'],['^\\circ','^\\circ'],['\\circ','\\circ']]),
+'Functions':sp(['sin','cos','tan','cot','arcsin','arccos','arctan','sinh','cosh','tanh','log','ln','exp','lim','max','min','det'].map(n=>['\\'+n,'\\'+n,n]))};
+let tab='Structures';const built={};
+function put(s){const t=$('tex'),a=t.selectionStart,b=t.selectionEnd,sel=t.value.slice(a,b),i=s.indexOf('§'),txt=s.replace('§',sel);
+ const pos=a+(i<0?txt.length:i+sel.length);t.value=t.value.slice(0,a)+txt+t.value.slice(b);t.focus();t.setSelectionRange(pos,pos);preview();}
+async function showTab(name){tab=name;
+ for(const b of $('tabs').children)b.classList.toggle('on',b.textContent===name);
+ for(const k in built)built[k].style.display=k===name?'':'none';
+ if(built[name])return;
+ const g=document.createElement('div');g.className='grid';built[name]=g;$('pal').appendChild(g);
+ for(const[l,s,t]of PAL[name]){const b=document.createElement('button');b.className='p';b.title=t+'   '+s.replace('§','');
+  b.onclick=()=>put(s);g.appendChild(b);
+  try{b.appendChild(await MathJax.tex2svgPromise(l,{display:false}));}catch(e){b.textContent=l;}}}
+function buildTabs(){for(const k of Object.keys(PAL)){const b=document.createElement('button');b.className='tb';b.textContent=k;b.onclick=()=>showTab(k);$('tabs').appendChild(b);}showTab(tab);}
+
 /* ---------- UI ---------- */
 let cur=null,tmr;
 async function preview(){try{$('prev').replaceChildren(await MathJax.tex2svgPromise($('tex').value||' '));}catch(e){}}
@@ -173,8 +364,12 @@ const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
 $('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
  const p=pkgFor(await render(t),t);
  await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted.');});
+$('insmt').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
+ const p=pkgMT(await render(t),t);
+ await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted as MathType object (double-click it to edit in MathType).');});
 $('upd').onclick=run(async()=>{const t=$('tex').value.trim(),p=pkgFor(await render(t),t);
  await Word.run(async c=>{c.document.getSelection().inlinePictures.getFirst().getRange('Whole').insertOoxml(p,'Replace');await c.sync();});say('Updated.');});
+/* MathType -> LaTeX (plugin equations) */
 $('cs').onclick=run(async()=>{let r;
  await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
   r=await convertOoxml(ox.value);if(r.n){s.insertOoxml(r.xml,'Replace');await c.sync();}});
@@ -186,9 +381,22 @@ $('ca').onclick=run(async()=>{let tot=0,errs=[];
    if(!/Equation\.(DSMT|3)/.test(ox[k].value))continue;
    const r=await convertOoxml(ox[k].value);errs.push(...r.errs);
    if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
- say(`Converted ${tot}. Check the result on a copy of your file.`+(errs.length?'\nFailed: '+errs.join('; '):''));});
+ say(`Converted ${tot}. Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
+/* LaTeX (plugin equations) -> MathType */
+$('ts').onclick=run(async()=>{let r;
+ await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
+  r=await toMathType(ox.value);if(r.n){s.insertOoxml(r.xml,'Replace');await c.sync();}});
+ say(`Converted ${r.n} to MathType.`+(r.errs.length?'\nProblems: '+r.errs.join('; '):''));});
+$('ta').onclick=run(async()=>{let tot=0,errs=[];
+ await Word.run(async c=>{const ps=c.document.body.paragraphs;ps.load('items');await c.sync();
+  const ox=ps.items.map(p=>p.getOoxml());await c.sync();
+  for(let k=ps.items.length-1;k>=0;k--){
+   if(!ox[k].value.includes('TEX:'))continue;
+   const r=await toMathType(ox[k].value);errs.push(...r.errs);
+   if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
+ say(`Converted ${tot} to MathType. Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
 async function onSel(){try{await Word.run(async c=>{const p=c.document.getSelection().inlinePictures;
  p.load('items/altTextDescription');await c.sync();const a=p.items[0]?.altTextDescription||'';
  cur=a.startsWith('TEX:')?a.slice(4):null;$('upd').disabled=!cur;if(cur){$('tex').value=cur;preview();}});}catch(e){}}
-Office.onReady(()=>{Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
+Office.onReady(()=>{buildTabs();Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
 </script></body></html>
