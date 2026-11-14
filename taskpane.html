@@ -61,55 +61,74 @@ function pkgFor(r,tex){
   +part('/word/document.xml','application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',`<w:document xmlns:w="${W}"><w:body><w:p>${run}</w:p></w:body></w:document>`)
   +part('/word/media/eqx.png','image/png',r.png,1)+part('/word/media/eqx.svg','image/svg+xml',b64(r.svg),1)+'</pkg:package>';}
 
-/* ---------- MTEF (MathType binary) -> LaTeX, best effort ---------- */
+/* ---------- MTEF v5 (MathType binary) -> LaTeX, best effort ---------- */
 const G=['alpha','beta','gamma','delta','epsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','o','pi','rho','varsigma','sigma','tau','upsilon','phi','chi','psi','omega'],
 GU=['A','B','\\Gamma','\\Delta','E','Z','H','\\Theta','I','K','\\Lambda','M','N','\\Xi','O','\\Pi','P','','\\Sigma','T','\\Upsilon','\\Phi','X','\\Psi','\\Omega'],
-SYM={0xb1:'\\pm',0xd7:'\\times',0xf7:'\\div',0x2264:'\\le',0x2265:'\\ge',0x2260:'\\ne',0x2248:'\\approx',0x221e:'\\infty',0x2192:'\\to',0x2211:'\\sum',0x220f:'\\prod',0x222b:'\\int',0x2202:'\\partial',0x2212:'-',0x22c5:'\\cdot',0x2026:'\\ldots',0x2208:'\\in',0x2207:'\\nabla',0x2200:'\\forall',0x2203:'\\exists',0x222a:'\\cup',0x2229:'\\cap'},
-ESC={123:'\\{',125:'\\}',92:'\\backslash ',95:'\\_',94:'\\^{}',37:'\\%',38:'\\&',35:'\\#',36:'\\$',32:'\\ '};
-function ch(c){if(c>=0x3b1&&c<=0x3c9)return G[c-0x3b1][0]=='o'&&G[c-0x3b1].length==1?'o':'\\'+G[c-0x3b1];
- if(c>=0x391&&c<=0x3a9&&GU[c-0x391])return GU[c-0x391];return SYM[c]||ESC[c]||String.fromCodePoint(c||63);}
-const EMB={2:'dot',3:'ddot',9:'tilde',10:'hat',11:'vec',17:'bar'};
-function tmpl(s,v,c){const g=n=>c[n]||'',F={0:['\\langle','\\rangle'],1:['(',')'],2:['\\{','\\}'],3:['[',']'],4:['|','|'],5:['\\|','\\|'],6:['\\lfloor','\\rfloor'],7:['\\lceil','\\rceil'],8:['[',')']},
+SYM={0xb1:'\\pm',0xd7:'\\times',0xf7:'\\div',0x2264:'\\le',0x2265:'\\ge',0x2260:'\\ne',0x2248:'\\approx',0x221e:'\\infty',0x2192:'\\to',0x2190:'\\leftarrow',0x21d2:'\\Rightarrow',0x2211:'\\sum',0x220f:'\\prod',0x222b:'\\int',0x2202:'\\partial',0x2212:'-',0x22c5:'\\cdot',0x2026:'\\ldots',0x2208:'\\in',0x2207:'\\nabla',0x2200:'\\forall',0x2203:'\\exists',0x222a:'\\cup',0x2229:'\\cap',0x2218:'\\circ',0xb0:'^\\circ',0x2032:"'",0x221a:'\\surd'},
+ESC={9:'\\qquad ',123:'\\{',125:'\\}',92:'\\backslash',95:'\\_',94:'\\^{}',37:'\\%',38:'\\&',35:'\\#',36:'\\$',126:'\\sim'};
+function ch(c){let r;
+ if(c>=0x3b1&&c<=0x3c9)r=G[c-0x3b1]==='o'?'o':'\\'+G[c-0x3b1];
+ else if(c>=0x391&&c<=0x3a9&&GU[c-0x391])r=GU[c-0x391];
+ else r=SYM[c]||ESC[c]||String.fromCodePoint(c||63);
+ return /^\\[a-zA-Z]+$/.test(r)?r+' ':r;}
+const EMB={2:'dot',3:'ddot',4:'dddot',9:'tilde',10:'hat',12:'vec',17:'bar',18:'bar'};
+function tmpl(s,v,c){const g=n=>c[n]||'',
+ FEN={0:['\\langle','\\rangle'],1:['(',')'],2:['\\{','\\}'],3:['[',']'],4:['|','|'],5:['\\|','\\|'],6:['\\lfloor','\\rfloor'],7:['\\lceil','\\rceil'],8:['[',')'],9:['(',']']},
  OP={15:'\\int',16:'\\sum',17:'\\prod',18:'\\coprod',19:'\\bigcup',20:'\\bigcap'};
- if(F[s])return'\\left'+(v!=2?F[s][0]:'.')+' '+g(0)+' \\right'+(v!=1?F[s][1]:'.')+' ';
- if(OP[s])return OP[s]+(g(1)?'_{'+g(1)+'}':'')+(g(2)?'^{'+g(2)+'}':'')+' '+g(0);
- switch(s){case 10:return v==1&&g(1)?`\\sqrt[${g(1)}]{${g(0)}}`:`\\sqrt{${g(0)}}`;
-  case 11:return`\\frac{${g(0)}}{${g(1)}}`;case 12:return`\\underline{${g(0)}}`;case 13:return`\\overline{${g(0)}}`;
-  case 23:return g(0)+(g(1)?'_{'+g(1)+'}':'');case 26:return`_{${g(0)}}`;case 27:return`^{${g(0)}}`;
-  case 28:return`_{${g(0)}}^{${g(1)}}`;case 30:return`\\vec{${g(0)}}`;case 31:return`\\tilde{${g(0)}}`;case 32:return`\\hat{${g(0)}}`;}
+ if(FEN[s])return'\\left'+(v&1?FEN[s][0]:'.')+' '+g(0)+' \\right'+(v&2?FEN[s][1]:'.')+' ';
+ if(OP[s])return OP[s]+(s>15?'\\limits':'')+(g(1)?'_{'+g(1)+'}':'')+(g(2)?'^{'+g(2)+'}':'')+' '+g(0);
+ switch(s){
+  case 10:return g(1)?`\\sqrt[${g(1)}]{${g(0)}}`:`\\sqrt{${g(0)}}`;
+  case 11:return`{\\frac{${g(0)}}{${g(1)}}}`;
+  case 12:return`\\underline{${g(0)}}`;case 13:return`\\overline{${g(0)}}`;
+  case 14:return`\\xrightarrow[${g(1)}]{${g(0)}}`;
+  case 23:return`\\mathop{${g(0)}}\\limits`+(g(1)?`_{${g(1)}}`:'')+(g(2)?`^{${g(2)}}`:'');
+  case 24:return v&1?`\\underbrace{${g(0)}}_{${g(1)}}`:`\\overbrace{${g(0)}}^{${g(1)}}`;
+  case 27:return`_{${g(0)||g(1)}}`;
+  case 28:return`^{${g(1)||g(0)}}`;
+  case 29:return`_{${g(0)}}^{${g(1)}}`;
+  case 31:return`\\vec{${g(0)}}`;case 32:return`\\widetilde{${g(0)}}`;case 33:return`\\widehat{${g(0)}}`;
+  case 37:return`\\boxed{${g(0)}}`;}
  return c.join(' ');}
 function mtefToTex(b){
- let i=b[0]|b[1]<<8;if(b[i]!==5)throw new Error('Unsupported MTEF v'+b[i]);
- i+=5;while(b[i++]);i++;
- const u8=()=>b[i++],nud=()=>{const x=u8(),y=u8();if(x==128&&y==128)i+=4;},
+ let i=b[0]|b[1]<<8;
+ if(b[i]!==5)throw new Error('Unsupported MTEF version '+b[i]+' (only MathType 4+ / MTEF 5 is supported)');
+ i+=5;while(b[i++]);i++;                        // header: 5 bytes, app key\0, options
+ const u8=()=>b[i++],
+ nud=()=>{const x=u8(),y=u8();if(x==128&&y==128)i+=4;},
  arr=()=>{let n=u8(),h=0;while(n>0){const x=b[i],nb=h?x&15:x>>4;if(h)i++;h^=1;if(nb==15)n--;}if(h)i++;},
- join=a=>{let o='',r='';const f=()=>{if(r){o+='\\mathrm{'+r+'}';r='';}};
-  for(const x of a){if(x.f==1||x.f==2)r+=x.s;else{f();o+=x.s;}}f();return o;};
+ join=a=>{let o='',r='',m=0;const f=()=>{if(r){o+=(m==1?'\\text{':m==2?'\\mathrm{':'\\mathbf{')+r+'}';r='';}};
+  for(const x of a){const k=x.f==1?1:x.f==2?2:x.f==7?3:0;
+   if(k){if(m!=k)f();m=k;r+=x.t!=null?x.t:x.s;}else{f();m=0;o+=x.s;}}f();return o;};
  function list(){const a=[];
-  while(i<b.length){const tg=u8(),t=tg&15,o=tg>>4;
-   if(t==0)break;
-   if(t==1){if(o&8)nud();if(o&4)i+=2;a.push({s:o&1?'':join(list())});}
-   else if(t==2){if(o&8)nud();const f=u8()-128;let c=0;
-    if(!(o&32))c=u8()|u8()<<8;if(o&4)c=c||u8();if(o&16)c=u8()|u8()<<8;
-    let s=ch(c);
-    if(o&1)while(i<b.length){const g=u8();if((g&15)==0)break;if(g>>4&8)nud();const e=EMB[u8()];if(e)s=`\\${e}{${s}}`;}
-    a.push({s,f});}
-   else if(t==3){if(o&8)nud();const sel=u8();let v=u8();if(v&128)v=(v&127)|u8()<<8;u8();
-    a.push({s:tmpl(sel,v,list().map(x=>x.s))});}
-   else if(t==4){if(o&8)nud();i+=2;a.push({s:'\\begin{matrix}'+list().map(x=>x.s).join('\\\\')+'\\end{matrix}'});}
-   else if(t==5){if(o&8)nud();i+=3;const R=u8(),C=u8();i+=Math.ceil((R+1)/4)+Math.ceil((C+1)/4);
-    const k=list().map(x=>x.s),rows=[];for(let r=0;r<R;r++)rows.push(k.slice(r*C,r*C+C).join('&'));
-    a.push({s:'\\begin{matrix}'+rows.join('\\\\')+'\\end{matrix}'});}
-   else if(t==6){if(o&8)nud();i++;}
-   else if(t==7){i+=3*u8();}
-   else if(t==8)i+=2;
-   else if(t==9){i+=u8()==101?2:1;}
-   else if(t>=10&&t<=14){}
-   else if(t==15)i++;
-   else if(t==17){i++;while(b[i++]);}
-   else if(t==18){i++;arr();arr();let n=u8();while(n--)if(u8())i++;}
-   else if(t==19){while(b[i++]);}
-   else throw new Error('Unhandled MTEF record '+t);}
+  while(i<b.length){const t=u8();
+   switch(t){
+    case 0:return a;
+    case 1:{const o=u8();if(o&8)nud();if(o&4)i+=2;a.push({s:o&1?'':join(list())});break;}
+    case 2:{const o=u8();if(o&8)nud();const f=u8()-128;let c=0,c8=0,c16=0;
+     if(!(o&32))c=u8()|u8()<<8;if(o&4)c8=u8();if(o&16)c16=u8()|u8()<<8;
+     c=c||c16||c8;let s=ch(c),pr='';
+     if(o&1)for(;;){const e=u8();if(e==0)break;const eo=u8();if(eo&8)nud();const k=u8();
+      if(k==5)pr+="'";else if(k==6)pr+="''";else if(EMB[k])s=`\\${EMB[k]}{${s}}`;}
+     const raw=String.fromCodePoint(c||63);
+     a.push({s:s+pr,f,t:/^[\x20-\x7e]$/.test(raw)&&!ESC[c]?raw:s});break;}
+    case 3:{const o=u8();if(o&8)nud();const sel=u8();let v=u8();if(v&128)v=(v&127)|u8()<<8;u8();
+     a.push({s:tmpl(sel,v,list().map(x=>x.s))});break;}
+    case 4:{const o=u8();if(o&8)nud();i+=2;a.push({s:'\\begin{matrix}'+list().map(x=>x.s).join('\\\\')+'\\end{matrix}'});break;}
+    case 5:{const o=u8();if(o&8)nud();i+=3;const R=u8(),C=u8();i+=Math.ceil((R+1)/4)+Math.ceil((C+1)/4);
+     const k=list().map(x=>x.s),rows=[];for(let r=0;r<R;r++)rows.push(k.slice(r*C,r*C+C).join('&'));
+     a.push({s:'\\begin{matrix}'+rows.join('\\\\')+'\\end{matrix}'});break;}
+    case 6:{const o=u8();if(o&8)nud();i++;break;}
+    case 7:i+=3*u8();break;
+    case 8:i+=2;break;
+    case 9:i+=u8()==101?2:1;break;
+    case 10:case 11:case 12:case 13:case 14:break;
+    case 15:i++;break;
+    case 16:{const o=u8();i+=o&1?8:6;if(o&4)while(b[i++]);break;}
+    case 17:i++;while(b[i++]);break;
+    case 18:{i++;arr();arr();let n=u8();while(n--)if(u8())i++;break;}
+    case 19:while(b[i++]);break;
+    default:throw new Error('Unhandled MTEF record '+t+' at byte '+(i-1));}}
   return a;}
  return join(list());}
 
@@ -119,23 +138,29 @@ async function convertOoxml(x){
  for(const p of d.getElementsByTagName('pkg:part'))P[p.getAttribute('pkg:name')]=p;
  const rel=P['/word/_rels/document.xml.rels'].getElementsByTagName('Relationships')[0],map={};
  for(const r of rel.getElementsByTagName('Relationship'))map[r.getAttribute('Id')]=r.getAttribute('Target');
- let n=0;const errs=[],id0=Date.now()%1e6;
- for(const o of [...d.getElementsByTagName('o:OLEObject')]){
-  if(!/^Equation\.(DSMT|3)/.test(o.getAttribute('ProgID')||''))continue;
+ let n=0;const errs=[],id0=Date.now()%1e6,all=[...d.getElementsByTagName('o:OLEObject')];
+ if(!all.length)errs.push('no embedded OLE objects found in the selection');
+ for(const o of all){
+  if(!/^Equation\.(DSMT|3)/.test(o.getAttribute('ProgID')||'')){errs.push('skipped '+o.getAttribute('ProgID'));continue;}
   try{
    const bin=P['/word/'+map[o.getAttribute('r:id')]].getElementsByTagName('pkg:binaryData')[0].textContent.replace(/\s/g,'');
    const f=CFB.find(CFB.read(Uint8Array.from(atob(bin),c=>c.charCodeAt(0)),{type:'array'}),'Equation Native');
    const tex=mtefToTex(f.content),r=await render(tex),k=n;
    let ob=o;while(ob&&ob.nodeName!=='w:object')ob=ob.parentNode;
    const dr=new DOMParser().parseFromString(drawing(tex,r.w,r.h,id0+k,'rIdEP'+k,'rIdES'+k),'application/xml').documentElement;
-   ob.parentNode.replaceChild(d.importNode(dr,true),ob);
+   const nd=d.importNode(dr,true),rr=ob.parentNode;rr.replaceChild(nd,ob);
+   if(r.pos&&rr.nodeName==='w:r'){let rp=[...rr.childNodes].find(q=>q.nodeName==='w:rPr');
+    if(!rp){rp=d.createElementNS(W,'w:rPr');rr.insertBefore(rp,rr.firstChild);}
+    const ps=d.createElementNS(W,'w:position');ps.setAttributeNS(W,'w:val',String(r.pos));
+    const nx=[...rp.childNodes].find(q=>/^w:(sz|szCs|highlight|u|effect|bdr|shd|fitText|vertAlign|rtl|cs|em|lang|eastAsianLayout|specVanish|oMath)$/.test(q.nodeName));
+    rp.insertBefore(ps,nx||null);}
    for(const[idn,ext]of[['rIdEP'+k,'png'],['rIdES'+k,'svg']]){
     const e=d.createElementNS(rel.namespaceURI,'Relationship');
     e.setAttribute('Id',idn);e.setAttribute('Type',RT+'/image');e.setAttribute('Target',`media/eq${k}.${ext}`);rel.appendChild(e);}
    const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">${imgParts(k,r)}</pkg:package>`,'application/xml');
    for(const c of [...add.documentElement.children])d.documentElement.appendChild(d.importNode(c,true));
    n++;
-  }catch(e){errs.push(e.message);}
+  }catch(e){errs.push(e.message);console.error(e);}
  }
  return{xml:new XMLSerializer().serializeToString(d),n,errs};
 }
@@ -153,7 +178,7 @@ $('upd').onclick=run(async()=>{const t=$('tex').value.trim(),p=pkgFor(await rend
 $('cs').onclick=run(async()=>{let r;
  await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
   r=await convertOoxml(ox.value);if(r.n){s.insertOoxml(r.xml,'Replace');await c.sync();}});
- say(`Converted ${r.n}.`+(r.errs.length?'\nFailed: '+r.errs.join('; '):''));});
+ say(`Converted ${r.n}.`+(r.errs.length?'\nProblems: '+r.errs.join('; '):''));});
 $('ca').onclick=run(async()=>{let tot=0,errs=[];
  await Word.run(async c=>{const ps=c.document.body.paragraphs;ps.load('items');await c.sync();
   const ox=ps.items.map(p=>p.getOoxml());await c.sync();
