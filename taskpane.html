@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TeX Equations</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cfb@1.2.2/dist/cfb.min.js"></script>
+<script>window.MathJax={svg:{fontCache:'none'},startup:{typeset:false}};</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+:root{--bg:#fff;--fg:#1b1b1b;--ac:#1f5fbf;--bd:#c8c8c8}
+@media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--fg:#eee;--ac:#5b9bff;--bd:#555}}
+body{font:14px system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:12px}
+textarea{width:100%;box-sizing:border-box;font:13px ui-monospace,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--bd);padding:6px}
+button{background:var(--ac);color:#fff;border:0;padding:8px 12px;margin:4px 4px 0 0;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+#prev{min-height:48px;border:1px dashed var(--bd);margin:8px 0;padding:8px;overflow-x:auto}
+#msg{font-size:12px;white-space:pre-wrap}hr{border:0;border-top:1px solid var(--bd);margin:12px 0}
+</style></head><body>
+<textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
+<div id="prev"></div>
+<button id="ins">Insert</button><button id="upd" disabled>Update selected</button>
+<hr>
+<b>MathType</b><br>
+<button id="cs">Convert selection</button><button id="ca">Convert whole document</button>
+<p id="msg"></p>
+<script>
+const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+PK='http://schemas.microsoft.com/office/2006/xmlPackage',
+RT='http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+PR='http://schemas.openxmlformats.org/package/2006/relationships';
+const $=id=>document.getElementById(id),say=t=>$('msg').textContent=t;
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const b64=s=>btoa(unescape(encodeURIComponent(s)));
+
+/* ---------- LaTeX -> SVG (+PNG fallback) ---------- */
+function toPng(svg,w,h){return new Promise((ok,no)=>{const i=new Image();
+ i.onload=()=>{const c=document.createElement('canvas');c.width=w*3;c.height=h*3;
+  c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/png').split(',')[1]);};
+ i.onerror=()=>no(new Error('PNG fallback failed'));
+ i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);});}
+async function render(tex){
+ const n=await MathJax.tex2svgPromise(tex,{display:false}),s=n.querySelector('svg');
+ if(s.querySelector('[data-mml-node="merror"]'))throw new Error('Invalid LaTeX');
+ const w=Math.round(parseFloat(s.getAttribute('width'))*EX),h=Math.round(parseFloat(s.getAttribute('height'))*EX),
+  va=parseFloat(s.style.verticalAlign)||0;
+ s.setAttribute('width',w+'px');s.setAttribute('height',h+'px');s.removeAttribute('style');
+ const svg=new XMLSerializer().serializeToString(s).replace(/currentColor/g,'#000000');
+ return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round(va*EX*1.5)};
+}
+
+/* ---------- OOXML helpers ---------- */
+function drawing(tex,w,h,id,rp,rs){const cx=w*9525,cy=h*9525;
+ return `<w:drawing xmlns:w="${W}" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:r="${RT}"><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="TexEq${id}" descr="${esc('TEX:'+tex)}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="eq.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rp}"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="${rs}"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`;}
+const part=(n,t,x,bin)=>`<pkg:part pkg:name="${n}" pkg:contentType="${t}"${bin?' pkg:compression="store"':''}>${bin?`<pkg:binaryData>${x}</pkg:binaryData>`:`<pkg:xmlData>${x}</pkg:xmlData>`}</pkg:part>`;
+const imgParts=(k,r)=>part(`/word/media/eq${k}.png`,'image/png',r.png,1)+part(`/word/media/eq${k}.svg`,'image/svg+xml',b64(r.svg),1);
+function pkgFor(r,tex){
+ const rels=`<Relationships xmlns="${PR}"><Relationship Id="rIdP" Type="${RT}/image" Target="media/eqx.png"/><Relationship Id="rIdS" Type="${RT}/image" Target="media/eqx.svg"/></Relationships>`;
+ const run=`<w:r>${r.pos?`<w:rPr><w:position w:val="${r.pos}"/></w:rPr>`:''}${drawing(tex,r.w,r.h,Date.now()%1e6,'rIdP','rIdS')}</w:r>`;
+ return `<pkg:package xmlns:pkg="${PK}">`
+  +part('/_rels/.rels','application/vnd.openxmlformats-package.relationships+xml',`<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${RT}/officeDocument" Target="word/document.xml"/></Relationships>`)
+  +part('/word/_rels/document.xml.rels','application/vnd.openxmlformats-package.relationships+xml',rels)
+  +part('/word/document.xml','application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',`<w:document xmlns:w="${W}"><w:body><w:p>${run}</w:p></w:body></w:document>`)
+  +part('/word/media/eqx.png','image/png',r.png,1)+part('/word/media/eqx.svg','image/svg+xml',b64(r.svg),1)+'</pkg:package>';}
+
+/* ---------- MTEF (MathType binary) -> LaTeX, best effort ---------- */
+const G=['alpha','beta','gamma','delta','epsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','o','pi','rho','varsigma','sigma','tau','upsilon','phi','chi','psi','omega'],
+GU=['A','B','\\Gamma','\\Delta','E','Z','H','\\Theta','I','K','\\Lambda','M','N','\\Xi','O','\\Pi','P','','\\Sigma','T','\\Upsilon','\\Phi','X','\\Psi','\\Omega'],
+SYM={0xb1:'\\pm',0xd7:'\\times',0xf7:'\\div',0x2264:'\\le',0x2265:'\\ge',0x2260:'\\ne',0x2248:'\\approx',0x221e:'\\infty',0x2192:'\\to',0x2211:'\\sum',0x220f:'\\prod',0x222b:'\\int',0x2202:'\\partial',0x2212:'-',0x22c5:'\\cdot',0x2026:'\\ldots',0x2208:'\\in',0x2207:'\\nabla',0x2200:'\\forall',0x2203:'\\exists',0x222a:'\\cup',0x2229:'\\cap'},
+ESC={123:'\\{',125:'\\}',92:'\\backslash ',95:'\\_',94:'\\^{}',37:'\\%',38:'\\&',35:'\\#',36:'\\$',32:'\\ '};
+function ch(c){if(c>=0x3b1&&c<=0x3c9)return G[c-0x3b1][0]=='o'&&G[c-0x3b1].length==1?'o':'\\'+G[c-0x3b1];
+ if(c>=0x391&&c<=0x3a9&&GU[c-0x391])return GU[c-0x391];return SYM[c]||ESC[c]||String.fromCodePoint(c||63);}
+const EMB={2:'dot',3:'ddot',9:'tilde',10:'hat',11:'vec',17:'bar'};
+function tmpl(s,v,c){const g=n=>c[n]||'',F={0:['\\langle','\\rangle'],1:['(',')'],2:['\\{','\\}'],3:['[',']'],4:['|','|'],5:['\\|','\\|'],6:['\\lfloor','\\rfloor'],7:['\\lceil','\\rceil'],8:['[',')']},
+ OP={15:'\\int',16:'\\sum',17:'\\prod',18:'\\coprod',19:'\\bigcup',20:'\\bigcap'};
+ if(F[s])return'\\left'+(v!=2?F[s][0]:'.')+' '+g(0)+' \\right'+(v!=1?F[s][1]:'.')+' ';
+ if(OP[s])return OP[s]+(g(1)?'_{'+g(1)+'}':'')+(g(2)?'^{'+g(2)+'}':'')+' '+g(0);
+ switch(s){case 10:return v==1&&g(1)?`\\sqrt[${g(1)}]{${g(0)}}`:`\\sqrt{${g(0)}}`;
+  case 11:return`\\frac{${g(0)}}{${g(1)}}`;case 12:return`\\underline{${g(0)}}`;case 13:return`\\overline{${g(0)}}`;
+  case 23:return g(0)+(g(1)?'_{'+g(1)+'}':'');case 26:return`_{${g(0)}}`;case 27:return`^{${g(0)}}`;
+  case 28:return`_{${g(0)}}^{${g(1)}}`;case 30:return`\\vec{${g(0)}}`;case 31:return`\\tilde{${g(0)}}`;case 32:return`\\hat{${g(0)}}`;}
+ return c.join(' ');}
+function mtefToTex(b){
+ let i=b[0]|b[1]<<8;if(b[i]!==5)throw new Error('Unsupported MTEF v'+b[i]);
+ i+=5;while(b[i++]);i++;
+ const u8=()=>b[i++],nud=()=>{const x=u8(),y=u8();if(x==128&&y==128)i+=4;},
+ arr=()=>{let n=u8(),h=0;while(n>0){const x=b[i],nb=h?x&15:x>>4;if(h)i++;h^=1;if(nb==15)n--;}if(h)i++;},
+ join=a=>{let o='',r='';const f=()=>{if(r){o+='\\mathrm{'+r+'}';r='';}};
+  for(const x of a){if(x.f==1||x.f==2)r+=x.s;else{f();o+=x.s;}}f();return o;};
+ function list(){const a=[];
+  while(i<b.length){const tg=u8(),t=tg&15,o=tg>>4;
+   if(t==0)break;
+   if(t==1){if(o&8)nud();if(o&4)i+=2;a.push({s:o&1?'':join(list())});}
+   else if(t==2){if(o&8)nud();const f=u8()-128;let c=0;
+    if(!(o&32))c=u8()|u8()<<8;if(o&4)c=c||u8();if(o&16)c=u8()|u8()<<8;
+    let s=ch(c);
+    if(o&1)while(i<b.length){const g=u8();if((g&15)==0)break;if(g>>4&8)nud();const e=EMB[u8()];if(e)s=`\\${e}{${s}}`;}
+    a.push({s,f});}
+   else if(t==3){if(o&8)nud();const sel=u8();let v=u8();if(v&128)v=(v&127)|u8()<<8;u8();
+    a.push({s:tmpl(sel,v,list().map(x=>x.s))});}
+   else if(t==4){if(o&8)nud();i+=2;a.push({s:'\\begin{matrix}'+list().map(x=>x.s).join('\\\\')+'\\end{matrix}'});}
+   else if(t==5){if(o&8)nud();i+=3;const R=u8(),C=u8();i+=Math.ceil((R+1)/4)+Math.ceil((C+1)/4);
+    const k=list().map(x=>x.s),rows=[];for(let r=0;r<R;r++)rows.push(k.slice(r*C,r*C+C).join('&'));
+    a.push({s:'\\begin{matrix}'+rows.join('\\\\')+'\\end{matrix}'});}
+   else if(t==6){if(o&8)nud();i++;}
+   else if(t==7){i+=3*u8();}
+   else if(t==8)i+=2;
+   else if(t==9){i+=u8()==101?2:1;}
+   else if(t>=10&&t<=14){}
+   else if(t==15)i++;
+   else if(t==17){i++;while(b[i++]);}
+   else if(t==18){i++;arr();arr();let n=u8();while(n--)if(u8())i++;}
+   else if(t==19){while(b[i++]);}
+   else throw new Error('Unhandled MTEF record '+t);}
+  return a;}
+ return join(list());}
+
+/* ---------- Convert MathType objects inside an OOXML package ---------- */
+async function convertOoxml(x){
+ const d=new DOMParser().parseFromString(x,'application/xml'),P={};
+ for(const p of d.getElementsByTagName('pkg:part'))P[p.getAttribute('pkg:name')]=p;
+ const rel=P['/word/_rels/document.xml.rels'].getElementsByTagName('Relationships')[0],map={};
+ for(const r of rel.getElementsByTagName('Relationship'))map[r.getAttribute('Id')]=r.getAttribute('Target');
+ let n=0;const errs=[],id0=Date.now()%1e6;
+ for(const o of [...d.getElementsByTagName('o:OLEObject')]){
+  if(!/^Equation\.(DSMT|3)/.test(o.getAttribute('ProgID')||''))continue;
+  try{
+   const bin=P['/word/'+map[o.getAttribute('r:id')]].getElementsByTagName('pkg:binaryData')[0].textContent.replace(/\s/g,'');
+   const f=CFB.find(CFB.read(Uint8Array.from(atob(bin),c=>c.charCodeAt(0)),{type:'array'}),'Equation Native');
+   const tex=mtefToTex(f.content),r=await render(tex),k=n;
+   let ob=o;while(ob&&ob.nodeName!=='w:object')ob=ob.parentNode;
+   const dr=new DOMParser().parseFromString(drawing(tex,r.w,r.h,id0+k,'rIdEP'+k,'rIdES'+k),'application/xml').documentElement;
+   ob.parentNode.replaceChild(d.importNode(dr,true),ob);
+   for(const[idn,ext]of[['rIdEP'+k,'png'],['rIdES'+k,'svg']]){
+    const e=d.createElementNS(rel.namespaceURI,'Relationship');
+    e.setAttribute('Id',idn);e.setAttribute('Type',RT+'/image');e.setAttribute('Target',`media/eq${k}.${ext}`);rel.appendChild(e);}
+   const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">${imgParts(k,r)}</pkg:package>`,'application/xml');
+   for(const c of [...add.documentElement.children])d.documentElement.appendChild(d.importNode(c,true));
+   n++;
+  }catch(e){errs.push(e.message);}
+ }
+ return{xml:new XMLSerializer().serializeToString(d),n,errs};
+}
+
+/* ---------- UI ---------- */
+let cur=null,tmr;
+async function preview(){try{$('prev').replaceChildren(await MathJax.tex2svgPromise($('tex').value||' '));}catch(e){}}
+$('tex').oninput=()=>{clearTimeout(tmr);tmr=setTimeout(preview,250);};
+const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
+$('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
+ const p=pkgFor(await render(t),t);
+ await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted.');});
+$('upd').onclick=run(async()=>{const t=$('tex').value.trim(),p=pkgFor(await render(t),t);
+ await Word.run(async c=>{c.document.getSelection().inlinePictures.getFirst().getRange('Whole').insertOoxml(p,'Replace');await c.sync();});say('Updated.');});
+$('cs').onclick=run(async()=>{let r;
+ await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
+  r=await convertOoxml(ox.value);if(r.n){s.insertOoxml(r.xml,'Replace');await c.sync();}});
+ say(`Converted ${r.n}.`+(r.errs.length?'\nFailed: '+r.errs.join('; '):''));});
+$('ca').onclick=run(async()=>{let tot=0,errs=[];
+ await Word.run(async c=>{const ps=c.document.body.paragraphs;ps.load('items');await c.sync();
+  const ox=ps.items.map(p=>p.getOoxml());await c.sync();
+  for(let k=ps.items.length-1;k>=0;k--){
+   if(!/Equation\.(DSMT|3)/.test(ox[k].value))continue;
+   const r=await convertOoxml(ox[k].value);errs.push(...r.errs);
+   if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
+ say(`Converted ${tot}. Check the result on a copy of your file.`+(errs.length?'\nFailed: '+errs.join('; '):''));});
+async function onSel(){try{await Word.run(async c=>{const p=c.document.getSelection().inlinePictures;
+ p.load('items/altTextDescription');await c.sync();const a=p.items[0]?.altTextDescription||'';
+ cur=a.startsWith('TEX:')?a.slice(4):null;$('upd').disabled=!cur;if(cur){$('tex').value=cur;preview();}});}catch(e){}}
+Office.onReady(()=>{Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
+</script></body></html>
