@@ -26,7 +26,7 @@ small{opacity:.6}
 <div id="tabs"></div><div id="pal"></div>
 <textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
 <div id="prev"></div>
-<button id="ins">Insert</button><button id="insmt">Insert as MathType</button>
+<button id="ins">Insert</button><button id="upd" disabled>Update selected</button><button id="insmt">Insert as MathType</button>
 <hr>
 <b>MathType &rarr; LaTeX</b><br><small>MathType objects become editable plugin equations</small><br>
 <button id="cs">Selection</button><button id="ca">Whole document</button>
@@ -34,7 +34,7 @@ small{opacity:.6}
 <b>LaTeX &rarr; MathType</b><br><small>Plugin equations become MathType objects</small><br>
 <button id="ts">Selection</button><button id="ta">Whole document</button>
 <p id="msg"></p>
-<small>build 5</small>
+<small>build 4</small>
 <script>
 const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -368,7 +368,7 @@ async function showTab(name){tab=name;
 function buildTabs(){for(const k of Object.keys(PAL)){const b=document.createElement('button');b.className='tb';b.textContent=k;b.onclick=()=>showTab(k);$('tabs').appendChild(b);}showTab(tab);}
 
 /* ---------- UI ---------- */
-let tmr;
+let cur=null,tmr;
 async function preview(){try{$('prev').replaceChildren(await MathJax.tex2svgPromise(norm($('tex').value||' '),{display:false}));}catch(e){}}
 $('tex').oninput=()=>{clearTimeout(tmr);tmr=setTimeout(preview,250);};
 const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
@@ -378,6 +378,8 @@ $('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
 $('insmt').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
  const p=pkgMT(await render(t),t);
  await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted as MathType object (double-click it to edit in MathType).');});
+$('upd').onclick=run(async()=>{const t=$('tex').value.trim(),p=pkgFor(await render(t),t);
+ await Word.run(async c=>{c.document.getSelection().inlinePictures.getFirst().getRange('Whole').insertOoxml(p,'Replace');await c.sync();});say('Updated.');});
 /* MathType -> LaTeX (plugin equations) */
 $('cs').onclick=run(async()=>{let r;
  await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
@@ -404,5 +406,8 @@ $('ta').onclick=run(async()=>{let tot=0,errs=[];
    const r=await toMathType(ox[k].value);errs.push(...r.errs);
    if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
  say(`Converted ${tot} to MathType. Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
-Office.onReady(()=>{buildTabs();});
+async function onSel(){try{await Word.run(async c=>{const p=c.document.getSelection().inlinePictures;
+ p.load('items/altTextDescription');await c.sync();const a=p.items[0]?.altTextDescription||'';
+ cur=a.startsWith('TEX:')?a.slice(4):null;$('upd').disabled=!cur;if(cur){$('tex').value=cur;preview();}});}catch(e){}}
+Office.onReady(()=>{buildTabs();Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
 </script></body></html>

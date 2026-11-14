@@ -7,7 +7,6 @@ A Word task pane that converts equations between LaTeX and MathType, with a menu
 ### Inserting LaTeX equations
 - **Insert**: inserts the LaTeX from the text box as a picture (SVG with a PNG fallback). The equation is visible in Word but cannot be edited in MathType.
 - **Insert as MathType**: inserts the formula as a real MathType object (`Equation.DSMT4`). Double-click it to edit in MathType.
-- **Update selected**: replaces a selected plugin equation with the text in the text box. This only works for equations created with this plugin.
 - A live preview of the formula appears below the text box.
 
 ### MathType → LaTeX
@@ -35,7 +34,7 @@ Click a button to insert its LaTeX into the text box. If you have text selected,
 ### Rendering
 - Fractions (and binomials) are always rendered at full size, so nested fractions do not shrink. The equation simply becomes larger. Sub- and superscripts remain smaller, as is standard. The LaTeX stored in the equation is not changed, so conversion to MathType still sees `\frac`.
 - Each equation picture has a nearly invisible background rectangle with a few pixels of padding, so clicking in the white space around a formula still selects it.
-- Equations inserted before build 4 keep their old look. Select one and press **Update selected** to re-render it.
+- Equations inserted before build 6 keep their old look until they are inserted again.
 
 ## Installation
 
@@ -57,7 +56,7 @@ Word caches add-ins. To see a new version:
    - **Mac**: the `Wef` folder under `~/Library/Containers/com.microsoft.Word/`
 4. Reopen Word.
 
-The current build appears at the bottom of the pane ("build 4"), so you can see which version is running.
+The current build appears at the bottom of the pane ("build 6"), so you can see which version is running.
 
 ## Requirements
 
