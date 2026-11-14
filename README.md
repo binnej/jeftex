@@ -16,6 +16,8 @@ not changed, so conversion to MathType still sees `\frac`.
 2. Open the add-in from the Home tab.
 3. The plug-in's website is currently hosted on github as a github page.
 
+Tip: ask Claude Ai for help when installing this plug-in. I noticed that it varies with different word version. 
+
 ## Requirements
 
 - Word 2016 or later (Windows or Mac), or Word on the web.
