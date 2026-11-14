@@ -7,8 +7,6 @@ This is a vibe coded word plug-in that generates LaTeX equations in word.
 
 As this is vibe coded, use at your own risk. First tests look promising. 
 not changed, so conversion to MathType still sees `\frac`.
-- Each equation picture has a nearly invisible background rectangle with a few pixels of padding, so clicking in the white space around a formula still selects it.
-- Equations inserted before build 6 keep their old look until they are inserted again.
 
 ## Installation
 
