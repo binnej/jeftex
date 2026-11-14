@@ -6,7 +6,6 @@ This is a vibe coded word plug-in that generates LaTeX equations in word.
 - Mathtype equations can be converted to the format of the plugin.
 
 As this is vibe coded, use at your own risk. First tests look promising. 
-not changed, so conversion to MathType still sees `\frac`.
 
 ## Installation
 
