@@ -1,4 +1,8 @@
 # JeFTeX: LaTeX and MathType add-in for Word
+=============================================
+<img src="logo_big.png" height="100">
+
+LaTeX and MathType add-in for Word
 
 A Word task pane that converts equations between LaTeX and MathType, with a menu bar of commonly used math constructs.
 
