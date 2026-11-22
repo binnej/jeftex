@@ -35,8 +35,11 @@ small{opacity:.6}
 <hr>
 <b>LaTeX &rarr; MathType</b><br><small>Plugin equations become MathType objects</small><br>
 <button id="ts">Selection</button><button id="ta">Whole document</button>
+<hr>
+<b>Word equation &rarr; LaTeX</b><br><small>Word's own equations become plugin equations</small><br>
+<button id="wa">Whole document</button>
 <p id="msg"></p>
-<small>build 9</small>
+<small>build 11</small>
 <script>
 const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -369,17 +372,147 @@ async function showTab(name){tab=name;
   try{b.appendChild((await MathJax.tex2svgPromise(l,{display:false})).querySelector('svg'));}catch(e){b.textContent=l;}}}
 function buildTabs(){for(const k of Object.keys(PAL)){const b=document.createElement('button');b.className='tb';b.textContent=k;b.onclick=()=>showTab(k);$('tabs').appendChild(b);}showTab(tab);}
 
+/* ---------- Word equation (OMML) -> LaTeX ---------- */
+const MNS='http://schemas.openxmlformats.org/officeDocument/2006/math';
+const USYM={'×':'\\times ','÷':'\\div ','±':'\\pm ','∓':'\\mp ','·':'\\cdot ','⋅':'\\cdot ','∙':'\\cdot ','∗':'*','∘':'\\circ ','−':'-','–':'-','≤':'\\le ','≥':'\\ge ','≠':'\\ne ','≈':'\\approx ','≡':'\\equiv ','∝':'\\propto ','∼':'\\sim ','≅':'\\cong ','∞':'\\infty ','∂':'\\partial ','∇':'\\nabla ','∈':'\\in ','∉':'\\notin ','⊂':'\\subset ','⊆':'\\subseteq ','⊃':'\\supset ','∪':'\\cup ','∩':'\\cap ','∀':'\\forall ','∃':'\\exists ','∅':'\\emptyset ','→':'\\to ','←':'\\leftarrow ','↔':'\\leftrightarrow ','⇒':'\\Rightarrow ','⇔':'\\Leftrightarrow ','⇐':'\\Leftarrow ','↦':'\\mapsto ','…':'\\ldots ','⋯':'\\cdots ','∑':'\\sum ','∏':'\\prod ','∫':'\\int ','∬':'\\iint ','∮':'\\oint ','√':'\\surd ','′':"'",'°':'^\\circ ','ℓ':'\\ell ','ℏ':'\\hbar ','⊕':'\\oplus ','⊗':'\\otimes ','⊥':'\\perp ','∥':'\\parallel ','∠':'\\angle ','∴':'\\therefore ','≪':'\\ll ','≫':'\\gg ','ℝ':'\\mathbb{R}','ℕ':'\\mathbb{N}','ℤ':'\\mathbb{Z}','ℚ':'\\mathbb{Q}','ℂ':'\\mathbb{C}','\u00a0':' ','\u2061':'','\u2062':'','\u2063':'','\u2064':'','\u200b':'','⁰':'^{0}','¹':'^{1}','²':'^{2}','³':'^{3}','⁴':'^{4}','⁵':'^{5}','⁶':'^{6}','⁷':'^{7}','⁸':'^{8}','⁹':'^{9}','ⁿ':'^{n}','₀':'_{0}','₁':'_{1}','₂':'_{2}','₃':'_{3}','₄':'_{4}','₅':'_{5}','₆':'_{6}','₇':'_{7}','₈':'_{8}','₉':'_{9}'},
+GKL=['alpha','beta','gamma','delta','varepsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','o','pi','rho','varsigma','sigma','tau','upsilon','varphi','chi','psi','omega'],
+GKU=['A','B','\\Gamma ','\\Delta ','E','Z','H','\\Theta ','I','K','\\Lambda ','M','N','\\Xi ','O','\\Pi ','P','','\\Sigma ','T','\\Upsilon ','\\Phi ','X','\\Psi ','\\Omega '],
+GKX={0x3f5:'\\epsilon ',0x3d5:'\\phi ',0x3d1:'\\vartheta ',0x3d6:'\\varpi ',0x3f1:'\\varrho '},
+TXE={'{':'\\{','}':'\\}','#':'\\#','$':'\\$','%':'\\%','&':'\\&','_':'\\_','^':'','~':'','\\':''},
+MXE={'{':'\\{ ','}':'\\} ','#':'\\# ','$':'\\$ ','%':'\\% ','&':'\\& ','_':'\\_ ','^':'\\^{}','~':'\\sim ','\\':'\\backslash '},
+FUNS='sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh coth log ln lg exp det dim gcd max min sup inf lim mod deg ker arg'.split(' '),
+ACCS={'\u0302':'hat','^':'hat','\u0303':'tilde','~':'tilde','\u0304':'bar','\u0305':'bar','¯':'bar','\u20d7':'vec','→':'vec','\u0307':'dot','\u0308':'ddot','\u030c':'check','\u0301':'acute','\u0300':'grave'},
+DLM={'(':'(',')':')','[':'[',']':']','{':'\\{','}':'\\}','|':'|','‖':'\\|','⟨':'\\langle','⟩':'\\rangle','〈':'\\langle','〉':'\\rangle','⌊':'\\lfloor','⌋':'\\rfloor','⌈':'\\lceil','⌉':'\\rceil'},
+NARY={'∑':'\\sum','∏':'\\prod','∐':'\\coprod','∫':'\\int','∬':'\\iint','∭':'\\iiint','∮':'\\oint','⋃':'\\bigcup','⋂':'\\bigcap'};
+function oSym(c){if(USYM[c]!==undefined)return USYM[c];const cp=c.codePointAt(0);
+ if(GKX[cp])return GKX[cp];
+ if(cp>=0x3b1&&cp<=0x3c9){const g=GKL[cp-0x3b1];return g==='o'?'o':'\\'+g+' ';}
+ if(cp>=0x391&&cp<=0x3a9&&GKU[cp-0x391])return GKU[cp-0x391];
+ return MXE[c]!==undefined?MXE[c]:c;}
+const oLN=e=>e.localName,oKids=e=>[...e.children],oCh=(e,n)=>oKids(e).find(k=>oLN(k)===n),
+ oV=e=>e?(e.getAttributeNS(MNS,'val')||e.getAttribute('m:val')):null,
+ oOn=e=>!!e&&!['0','false','off'].includes(oV(e)),
+ oSeq=e=>oKids(e).map(oConv).join(''),oArg=(e,n)=>{const k=oCh(e,n);return k?oSeq(k).trim():'';},
+ oTxt=e=>e.textContent.replace(/\s+/g,''),
+ oGrp=s=>/^(\\[a-zA-Z]+ ?|[^\s\\{}])$/.test(s)?s:'{'+s+'}',
+ oDel=(e,n,d)=>{const k=oCh(e,n);return k?oV(k):d;};
+function oRun(e){const rp=oCh(e,'rPr'),sty=rp&&oV(oCh(rp,'sty')),nor=rp&&oOn(oCh(rp,'nor')),
+ t=oKids(e).filter(k=>oLN(k)==='t').map(k=>k.textContent).join('');
+ if(nor)return'\\text{'+[...t].map(c=>TXE[c]!==undefined?TXE[c]:c).join('')+'}';
+ const s=t.replace(/\s+/g,'');
+ if(sty==='p'&&/^[A-Za-z]+$/.test(s))return'\\mathrm{'+s+'}';
+ if((sty==='b'||sty==='bi')&&/^[A-Za-z0-9]+$/.test(s))return'\\mathbf{'+s+'}';
+ return t.split(/([A-Za-z]{2,})/).map(p=>FUNS.includes(p)?'\\'+p+' ':[...p.replace(/\s+/g,'')].map(oSym).join('')).join('');}
+function oConv(e){const n=oLN(e);if(/Pr$/.test(n))return'';
+ switch(n){
+ case'r':return oRun(e);
+ case'f':{const ty=oV(oCh(oCh(e,'fPr')||e,'type')),a=oArg(e,'num'),b=oArg(e,'den');
+  if(ty==='lin'||ty==='skw')return a+'/'+b;if(ty==='noBar')return`\\binom{${a}}{${b}}`;return`{\\frac{${a}}{${b}}}`;}
+ case'rad':{const hide=oOn(oCh(oCh(e,'radPr')||e,'degHide')),dg=oArg(e,'deg'),b=oArg(e,'e');return dg&&!hide?`\\sqrt[${dg}]{${b}}`:`\\sqrt{${b}}`;}
+ case'sSup':return oGrp(oArg(e,'e'))+'^{'+oArg(e,'sup')+'}';
+ case'sSub':return oGrp(oArg(e,'e'))+'_{'+oArg(e,'sub')+'}';
+ case'sSubSup':return oGrp(oArg(e,'e'))+'_{'+oArg(e,'sub')+'}^{'+oArg(e,'sup')+'}';
+ case'sPre':return'{}_{'+oArg(e,'sub')+'}^{'+oArg(e,'sup')+'}'+oGrp(oArg(e,'e'));
+ case'nary':{const p=oCh(e,'naryPr'),chr=p&&oCh(p,'chr'),c=chr?oV(chr):'∫',op=NARY[c]||'\\int',
+  loc=p&&oV(oCh(p,'limLoc')),und=loc?loc==='undOvr':'∑∏∐⋃⋂'.includes(c),
+  sb=p&&oOn(oCh(p,'subHide'))?'':oArg(e,'sub'),sp=p&&oOn(oCh(p,'supHide'))?'':oArg(e,'sup');
+  return op+(und&&(sb||sp)?'\\limits':'')+(sb?'_{'+sb+'}':'')+(sp?'^{'+sp+'}':'')+' '+oArg(e,'e');}
+ case'd':{const bc=oDel(e,'begChr','(');const p=oCh(e,'dPr');
+  const g=(k,d)=>{const x=p&&oCh(p,k);return x?oV(x):d;},b=g('begChr','('),en=g('endChr',')'),sep=g('sepChr','|');
+  const es=oKids(e).filter(k=>oLN(k)==='e'),L=b===''?'.':(DLM[b]||'.'),R=en===''?'.':(DLM[en]||'.');
+  if(es.length===1){const only=oKids(es[0]).filter(k=>!/Pr$/.test(oLN(k)));
+   if(only.length===1&&oLN(only[0])==='m'){const env={'(|)':'p','[|]':'b','{|}':'B','||':'v'}[b+'|'+en];
+    if(env)return oMat(only[0],env+'matrix');}
+   if(only.length===1&&oLN(only[0])==='eqArr'&&b==='{'&&en==='')return oEq(only[0],'cases');}
+  const sepT=sep===''?' ':[...sep].map(oSym).join('');
+  return`\\left${L} ${es.map(x=>oSeq(x).trim()).join(sepT)} \\right${R} `;}
+ case'func':{const fn=oCh(e,'fName'),nm=oTxt(fn),body=oArg(e,'e');
+  if(oKids(fn).every(k=>oLN(k)==='r'))return(FUNS.includes(nm)?'\\'+nm+' ':'\\operatorname{'+nm+'}')+' '+body;
+  return oSeq(fn).trim()+' '+body;}
+ case'limLow':{const b=oArg(e,'e'),l=oArg(e,'lim'),nm=oTxt(oCh(e,'e'));
+  return FUNS.includes(nm)?'\\'+nm+'_{'+l+'} ':`\\underset{${l}}{${b}}`;}
+ case'limUpp':return`\\overset{${oArg(e,'lim')}}{${oArg(e,'e')}}`;
+ case'acc':{const p=oCh(e,'accPr'),c=p&&oCh(p,'chr')?oV(oCh(p,'chr')):'\u0302',a=ACCS[c]||'hat',b=oArg(e,'e'),w=oGrp(b)===b;
+  return a==='bar'&&!w?`\\overline{${b}}`:((a==='hat'||a==='tilde')&&!w?`\\wide${a}{${b}}`:`\\${a}{${b}}`);}
+ case'bar':{const p=oCh(e,'barPr'),pos=p&&oV(oCh(p,'pos'));return(pos==='top'?'\\overline{':'\\underline{')+oArg(e,'e')+'}';}
+ case'groupChr':{const p=oCh(e,'groupChrPr'),c=p&&oCh(p,'chr')?oV(oCh(p,'chr')):'⏟';
+  return c==='⏞'?`\\overbrace{${oArg(e,'e')}}`:c==='⏟'?`\\underbrace{${oArg(e,'e')}}`:oArg(e,'e');}
+ case'm':return oMat(e,'matrix');
+ case'eqArr':return oEq(e,'aligned');
+ case'borderBox':return`\\boxed{${oArg(e,'e')}}`;
+ default:return oSeq(e);}}
+function oMat(m,env){const rows=oKids(m).filter(k=>oLN(k)==='mr').map(r=>oKids(r).filter(k=>oLN(k)==='e').map(x=>oSeq(x).trim()).join(' & '));
+ return`\\begin{${env}} ${rows.join(' \\\\ ')} \\end{${env}}`;}
+function oEq(e,env){const rows=oKids(e).filter(k=>oLN(k)==='e').map(x=>oSeq(x).trim().replace(/\\&/g,'&'));
+ return`\\begin{${env}} ${rows.join(' \\\\ ')} \\end{${env}}`;}
+function ommlToTex(el){return oSeq(el).replace(/\s+/g,' ').trim();}
+/* OOXML with a Word equation -> plugin picture(s) */
+async function convertOmml(x){
+ const d=new DOMParser().parseFromString(x,'application/xml'),P={};
+ for(const p of d.getElementsByTagName('pkg:part'))P[p.getAttribute('pkg:name')]=p;
+ const rel=P['/word/_rels/document.xml.rels'].getElementsByTagName('Relationships')[0];
+ const units=[...d.getElementsByTagNameNS(MNS,'oMathPara'),...[...d.getElementsByTagNameNS(MNS,'oMath')].filter(m=>!m.parentNode||oLN(m.parentNode)!=='oMathPara')];
+ let n=0;const errs=[],id0=Date.now()%1e6;
+ if(!units.length)errs.push('no Word equations found');
+ for(const u of units){
+  try{const ms=oLN(u)==='oMathPara'?oKids(u).filter(k=>oLN(k)==='oMath'):[u],runs=[];
+   for(const m of ms){const tex=ommlToTex(m);if(!tex)continue;const r=await render(tex),k=n+runs.length;
+    runs.push({tex,r,k});}
+   if(!runs.length)continue;
+   const par=u.parentNode,frag=[];
+   runs.forEach((o,i)=>{if(i)frag.push(`<w:r xmlns:w="${W}"><w:br/></w:r>`);
+    frag.push(`<w:r xmlns:w="${W}">${o.r.pos?`<w:rPr><w:position w:val="${o.r.pos}"/></w:rPr>`:''}${drawing(o.tex,o.r.w,o.r.h,id0+o.k,'rIdWP'+o.k,'rIdWS'+o.k)}</w:r>`);});
+   for(const s of frag)par.insertBefore(d.importNode(new DOMParser().parseFromString(s,'application/xml').documentElement,true),u);
+   par.removeChild(u);
+   for(const o of runs){
+    for(const[idn,ext]of[['rIdWP'+o.k,'png'],['rIdWS'+o.k,'svg']]){const e=d.createElementNS(rel.namespaceURI,'Relationship');
+     e.setAttribute('Id',idn);e.setAttribute('Type',RT+'/image');e.setAttribute('Target',`media/eqw${o.k}.${ext}`);rel.appendChild(e);}
+    const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">${part(`/word/media/eqw${o.k}.png`,'image/png',o.r.png,1)+part(`/word/media/eqw${o.k}.svg`,'image/svg+xml',b64(o.r.svg),1)}</pkg:package>`,'application/xml');
+    for(const c of [...add.documentElement.children])d.documentElement.appendChild(d.importNode(c,true));}
+   if(oLN(u)==='oMathPara'&&par.nodeName==='w:p'){let pp=[...par.childNodes].find(q=>q.nodeName==='w:pPr');
+    if(!pp){pp=d.createElementNS(W,'w:pPr');par.insertBefore(pp,par.firstChild);}
+    if(![...pp.childNodes].some(q=>q.nodeName==='w:jc')){const jc=d.createElementNS(W,'w:jc');jc.setAttributeNS(W,'w:val','center');
+     const nx=[...pp.childNodes].find(q=>/^w:(textDirection|textAlignment|textboxTightWrap|outlineLvl|divId|cnfStyle|rPr|sectPr|pPrChange)$/.test(q.nodeName));pp.insertBefore(jc,nx||null);}}
+   n+=runs.length;
+  }catch(e){errs.push(e.message);}}
+ return{xml:new XMLSerializer().serializeToString(d),n,errs};}
+/* first MathType object in an OOXML package -> LaTeX */
+function oleTex(x){const d=new DOMParser().parseFromString(x,'application/xml'),P={};
+ for(const p of d.getElementsByTagName('pkg:part'))P[p.getAttribute('pkg:name')]=p;
+ const map={};for(const r of P['/word/_rels/document.xml.rels'].getElementsByTagName('Relationship'))map[r.getAttribute('Id')]=r.getAttribute('Target');
+ for(const o of d.getElementsByTagName('o:OLEObject')){if(!/^Equation\.(DSMT|3)/.test(o.getAttribute('ProgID')||''))continue;
+  const bin=P['/word/'+map[o.getAttribute('r:id')]].getElementsByTagName('pkg:binaryData')[0].textContent.replace(/\s/g,'');
+  return mtefToTex(CFB.find(CFB.read(Uint8Array.from(atob(bin),c=>c.charCodeAt(0)),{type:'array'}),'Equation Native').content);}
+ return null;}
+/* what does the current selection hold? */
+function fromOoxml(v,para){
+ if(!para&&/Equation\.(DSMT|3)/.test(v)){try{const t=oleTex(v);if(t)return{tex:t,ctx:null,what:'MathType equation'};}
+  catch(e){say('Could not read this MathType equation: '+e.message);return null;}}
+ if(!/<m:oMath/.test(v))return null;
+ const d=new DOMParser().parseFromString(v,'application/xml'),ms=[...d.getElementsByTagNameNS(MNS,'oMath')];
+ if(!ms.length)return null;
+ if(!para){const t=ommlToTex(ms[0]);return t?{tex:t,ctx:null,what:'Word equation'}:null;}
+ if(ms.length!==1||[...d.getElementsByTagNameNS(W,'t')].some(t=>t.textContent.trim()))return null;
+ const t=ommlToTex(ms[0]);return t?{tex:t,ctx:'para',what:'Word equation'}:null;}
+
 /* ---------- UI ---------- */
 let tmr;
 async function preview(){try{$('prev').replaceChildren((await MathJax.tex2svgPromise(norm($('tex').value||' '),{display:false})).querySelector('svg'));}catch(e){}}
 $('tex').oninput=()=>{clearTimeout(tmr);tmr=setTimeout(preview,250);};
 const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
+/* Insert: put the equation in the document, leave the cursor after it, and clear the editor.
+   Clicking an equation (plugin, MathType or Word) loads its LaTeX back into the editor. */
+let quiet=0,ctx=null;
+const clearEq=()=>{$('tex').value='';$('prev').replaceChildren();ctx=null;};
+async function putEq(build){const para=ctx==='para',pkg=await build(),
+  x=para?pkg.replace('<w:p><w:r>','<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r>'):pkg;
+ quiet=Date.now()+3000;
+ await Word.run(async c=>{const s=c.document.getSelection(),r=(para?s.paragraphs.getFirst():s).insertOoxml(x,'Replace');try{r.select('End');}catch(e){}await c.sync();});
+ quiet=Date.now()+1000;clearEq();}
 $('ins').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
- const p=pkgFor(await render(t),t);
- await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted.');});
+ await putEq(async()=>pkgFor(await render(t),t));say('Inserted. Click the equation to edit it again.');});
 $('insmt').onclick=run(async()=>{const t=$('tex').value.trim();if(!t)return;
- const p=pkgMT(await render(t),t);
- await Word.run(async c=>{c.document.getSelection().insertOoxml(p,'Replace');await c.sync();});say('Inserted as MathType object (double-click it to edit in MathType).');});
+ await putEq(async()=>pkgMT(await render(t),t));say('Inserted as MathType object. Click it to edit the LaTeX, double-click to edit in MathType.');});
 /* MathType -> LaTeX (plugin equations) */
 $('cs').onclick=run(async()=>{let r;
  await Word.run(async c=>{const s=c.document.getSelection(),ox=s.getOoxml();await c.sync();
@@ -406,5 +539,28 @@ $('ta').onclick=run(async()=>{let tot=0,errs=[];
    const r=await toMathType(ox[k].value);errs.push(...r.errs);
    if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
  say(`Converted ${tot} to MathType. Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
-Office.onReady(()=>{buildTabs();});
+/* Word equation -> LaTeX (whole document) */
+$('wa').onclick=run(async()=>{let tot=0,errs=[];
+ await Word.run(async c=>{const ps=c.document.body.paragraphs;ps.load('items');await c.sync();
+  const ox=ps.items.map(p=>p.getOoxml());await c.sync();
+  for(let k=ps.items.length-1;k>=0;k--){
+   if(!/<m:oMath/.test(ox[k].value))continue;
+   const r=await convertOmml(ox[k].value);errs.push(...r.errs);
+   if(r.n){ps.items[k].insertOoxml(r.xml,'Replace');await c.sync();tot+=r.n;}}});
+ say(`Converted ${tot} Word equation(s). Check the result on a copy of your file.`+(errs.length?'\nProblems: '+errs.join('; '):''));});
+/* Selection: load the LaTeX of the clicked equation into the editor */
+let selT=0,selBusy=false;
+function onSel(){clearTimeout(selT);selT=setTimeout(selWork,250);}
+async function selWork(){if(Date.now()<quiet||selBusy)return;selBusy=true;
+ try{let got=null;
+  await Word.run(async c=>{const s=c.document.getSelection(),pics=s.inlinePictures;
+   pics.load('items/altTextDescription');s.load('isEmpty');await c.sync();
+   const a=pics.items[0]?.altTextDescription||'';
+   if(a.startsWith('TEX:')){got={tex:a.slice(4),ctx:null,what:'plugin equation'};return;}
+   const ox=s.isEmpty?s.paragraphs.getFirst().getOoxml():s.getOoxml();await c.sync();
+   got=fromOoxml(ox.value,s.isEmpty);});
+  if(got){if(Date.now()>=quiet){$('tex').value=got.tex;ctx=got.ctx;preview();say(`Loaded ${got.what}. Edit it and press Insert to replace it.`);}}
+  else ctx=null;
+ }catch(e){}finally{selBusy=false;}}
+Office.onReady(()=>{buildTabs();Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
 </script></body></html>
