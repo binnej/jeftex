@@ -5,7 +5,7 @@ A Word task pane that converts equations between LaTeX and MathType, with a menu
 > **Warning: this is a vibe-coded project.**
 > Most of the code was written with an AI assistant and has not had a thorough human code review or a full test suite. It has only been tested in a limited way, and not everything has been verified in Word with MathType (see "Tested" below). Bugs are likely. Always work on a copy of your document, check converted equations visually, and do not rely on it for important documents without verifying the result.
 
-Human here: I use this plugin often and results are thusfar good.
+Human here: in my experience, it works pretty well. Cheers!
 
 ## Features
 
