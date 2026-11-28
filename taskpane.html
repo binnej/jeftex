@@ -3,8 +3,21 @@
 <title>JeFTeX</title>
 <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/cfb@1.2.2/dist/cfb.min.js"></script>
-<script>window.MathJax={svg:{fontCache:'none'},startup:{typeset:false}};</script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script>
+/* Math font: chosen in the pane, stored in localStorage, applied by reloading the pane
+   (MathJax reads its font from the configuration below before it starts). */
+const MJV='4.1.3',DEF_FONT='mathjax-tex',
+FONTS=[['mathjax-tex','MathJax TeX (classic)'],['mathjax-newcm','New Computer Modern'],['mathjax-modern','Latin Modern'],
+['mathjax-termes','Termes (Times-like)'],['mathjax-stix2','STIX Two (Times-like)'],['mathjax-pagella','Pagella (Palatino-like)'],
+['mathjax-bonum','Bonum (Bookman-like)'],['mathjax-schola','Schola (Century Schoolbook-like)'],['mathjax-asana','Asana'],['mathjax-fira','Fira (sans-serif)']];
+let FONT=DEF_FONT;try{const f=localStorage.getItem('jeftex.font');if(FONTS.some(x=>x[0]===f))FONT=f;}catch(e){}
+let MJFAIL=null;  /* MathJax's loader reports a missing font file as an uncaught error and then never finishes */
+addEventListener('error',e=>{if(/Can.t load/.test(e.message||''))MJFAIL=e.message;});
+addEventListener('unhandledrejection',e=>{const m=String(e.reason&&e.reason.message||e.reason||'');if(/Can.t load/.test(m))MJFAIL=m;});
+window.MathJax={output:{font:FONT,fontPath:'https://cdn.jsdelivr.net/npm/@mathjax/%%FONT%%-font@'+MJV},
+ svg:{fontCache:'none',linebreaks:{inline:false}},startup:{typeset:false}};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-svg.js"></script>
 <style>
 :root{--bg:#fff;--fg:#1b1b1b;--ac:#1f5fbf;--bd:#c8c8c8;--hv:#e8f0fc}
 @media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--fg:#eee;--ac:#5b9bff;--bd:#555;--hv:#2c3a52}}
@@ -22,12 +35,14 @@ button.p svg{max-width:130px;height:auto}
 #prev{min-height:48px;border:1px dashed var(--bd);margin:8px 0;padding:8px;overflow-x:auto}
 #msg{font-size:12px;white-space:pre-wrap}hr{border:0;border-top:1px solid var(--bd);margin:12px 0}
 small{opacity:.6}
+#fr{margin:6px 0;font-size:12px}#fr select{font:12px system-ui,sans-serif;background:var(--bg);color:var(--fg);border:1px solid var(--bd);padding:3px;max-width:100%}
 #hd{margin-bottom:10px}#hd img{display:block;max-height:64px;height:auto;width:auto;max-width:100%}
 </style></head><body>
 <div id="hd"><img src="logo_big.png?v=9" alt="JeFTeX"></div>
 <div id="tabs"></div><div id="pal"></div>
 <textarea id="tex" rows="3" placeholder="\frac{a}{b}+\sqrt{x}"></textarea>
 <div id="prev"></div>
+<div id="fr"><label>Font: <select id="fnt"></select></label> <small>for new equations and the palette</small></div>
 <button id="ins">Insert</button><button id="insmt">Insert as MathType</button>
 <hr>
 <b>MathType &rarr; LaTeX</b><br><small>MathType objects become editable plugin equations</small><br>
@@ -39,14 +54,16 @@ small{opacity:.6}
 <b>Word equation &rarr; LaTeX</b><br><small>Word's own equations become plugin equations</small><br>
 <button id="wa">Whole document</button>
 <p id="msg"></p>
-<small>build 11</small>
+<small>build 12</small>
 <script>
-const EX=7,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+const EMPX=16,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
 RT='http://schemas.openxmlformats.org/officeDocument/2006/relationships',
 PR='http://schemas.openxmlformats.org/package/2006/relationships';
 const $=id=>document.getElementById(id),say=t=>$('msg').textContent=t;
 const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* MathJax 4 loads its font asynchronously: wait for it before converting */
+const mj=async t=>{await MathJax.startup.promise;return MathJax.tex2svgPromise(t,{display:false});};
 const b64=s=>btoa(unescape(encodeURIComponent(s)));
 
 /* ---------- LaTeX -> SVG (+PNG fallback) ---------- */
@@ -59,11 +76,13 @@ function toPng(svg,w,h){return new Promise((ok,no)=>{const i=new Image();
    The stored TeX (alt text) is left untouched; only the rendering is adjusted. */
 const PAD=3,norm=t=>t.replace(/\\(?:frac|tfrac)(?![a-zA-Z])/g,'\\dfrac').replace(/\\binom(?![a-zA-Z])/g,'\\dbinom');
 async function render(tex){
- const n=await MathJax.tex2svgPromise(norm(tex),{display:false}),s=n.querySelector('svg');
+ const n=await mj(norm(tex)),s=n.querySelector('svg');
  if(s.querySelector('[data-mml-node="merror"]'))throw new Error('Invalid LaTeX');
- const w0=parseFloat(s.getAttribute('width'))*EX,h0=parseFloat(s.getAttribute('height'))*EX,
-  va=parseFloat(s.style.verticalAlign)||0,vb=s.getAttribute('viewBox').split(/[\s,]+/).map(Number),
-  pu=PAD*vb[2]/w0,box=[vb[0]-pu,vb[1]-pu,vb[2]+2*pu,vb[3]+2*pu],
+ vb=s.getAttribute('viewBox').split(/[\s,]+/).map(Number),
+  upx=vb[2]/parseFloat(s.getAttribute('width')),  /* font units per ex: differs per font */
+  K=EMPX/1000,                                    /* px per font unit: 1 em = EMPX px in every font */
+  w0=vb[2]*K,h0=vb[3]*K,vaPx=(parseFloat(s.style.verticalAlign)||0)*upx*K,
+  pu=PAD/K,box=[vb[0]-pu,vb[1]-pu,vb[2]+2*pu,vb[3]+2*pu],
   w=Math.round(w0)+2*PAD,h=Math.round(h0)+2*PAD;
  /* near-invisible background box: makes the whole rectangle clickable in Word */
  s.setAttribute('viewBox',box.join(' '));
@@ -73,7 +92,7 @@ async function render(tex){
  s.insertBefore(bg,s.firstChild);
  s.setAttribute('width',w+'px');s.setAttribute('height',h+'px');s.removeAttribute('style');
  const svg=new XMLSerializer().serializeToString(s).replace(/currentColor/g,'#000000');
- return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round((va*EX-PAD)*1.5)};
+ return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round((vaPx-PAD)*1.5)};
 }
 
 /* ---------- OOXML helpers ---------- */
@@ -369,7 +388,7 @@ async function showTab(name){tab=name;
  const g=document.createElement('div');g.className='grid';built[name]=g;$('pal').appendChild(g);
  for(const[l,s,t]of PAL[name]){const b=document.createElement('button');b.className='p';b.title=t+'   '+s.replace('§','');
   b.onclick=()=>put(s);g.appendChild(b);
-  try{b.appendChild((await MathJax.tex2svgPromise(l,{display:false})).querySelector('svg'));}catch(e){b.textContent=l;}}}
+  try{b.appendChild((await mj(l)).querySelector('svg'));}catch(e){b.textContent=l;}}}
 function buildTabs(){for(const k of Object.keys(PAL)){const b=document.createElement('button');b.className='tb';b.textContent=k;b.onclick=()=>showTab(k);$('tabs').appendChild(b);}showTab(tab);}
 
 /* ---------- Word equation (OMML) -> LaTeX ---------- */
@@ -497,7 +516,7 @@ function fromOoxml(v,para){
 
 /* ---------- UI ---------- */
 let tmr;
-async function preview(){try{$('prev').replaceChildren((await MathJax.tex2svgPromise(norm($('tex').value||' '),{display:false})).querySelector('svg'));}catch(e){}}
+async function preview(){try{$('prev').replaceChildren((await mj(norm($('tex').value||' '))).querySelector('svg'));}catch(e){}}
 $('tex').oninput=()=>{clearTimeout(tmr);tmr=setTimeout(preview,250);};
 const run=f=>async()=>{try{await f();}catch(e){say('Error: '+e.message);}};
 /* Insert: put the equation in the document, leave the cursor after it, and clear the editor.
@@ -562,5 +581,28 @@ async function selWork(){if(Date.now()<quiet||selBusy)return;selBusy=true;
   if(got){if(Date.now()>=quiet){$('tex').value=got.tex;ctx=got.ctx;preview();say(`Loaded ${got.what}. Edit it and press Insert to replace it.`);}}
   else ctx=null;
  }catch(e){}finally{selBusy=false;}}
-Office.onReady(()=>{buildTabs();Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
+/* Font selector: store the choice, keep the editor content, reload the pane with the new font */
+const FS=$('fnt');
+for(const[v,l]of FONTS){const o=document.createElement('option');o.value=v;o.textContent=l;FS.appendChild(o);}
+FS.value=FONT;
+FS.onchange=()=>{try{localStorage.setItem('jeftex.font',FS.value);
+  if(localStorage.getItem('jeftex.font')!==FS.value)throw 0;
+  sessionStorage.setItem('jeftex.keep',JSON.stringify({tex:$('tex').value,tab,ctx}));
+ }catch(e){FS.value=FONT;say('Could not save the font choice (browser storage is blocked).');return;}
+ location.reload();};
+const fontName=()=>(FONTS.find(x=>x[0]===FONT)||[,FONT])[1];
+Office.onReady(async()=>{
+ try{await new Promise((ok,no)=>{const t0=Date.now(),iv=setInterval(()=>{
+   if(MJFAIL){clearInterval(iv);no(new Error(MJFAIL));}else if(Date.now()-t0>20000){clearInterval(iv);no(new Error('timeout'));}},150);
+  MathJax.startup.promise.then(()=>MathJax.tex2svgPromise('x')).then(()=>{clearInterval(iv);ok();},e=>{clearInterval(iv);no(e);});});}
+ catch(e){
+  if(FONT!==DEF_FONT){try{localStorage.removeItem('jeftex.font');}catch(_){}
+   try{sessionStorage.setItem('jeftex.msg','Could not load the font "'+fontName()+'". Back to the default font.');}catch(_){}
+   location.reload();return;}
+  say('MathJax could not be loaded: '+(e&&e.message||e));return;}
+ try{const k=JSON.parse(sessionStorage.getItem('jeftex.keep')||'null');sessionStorage.removeItem('jeftex.keep');
+  if(k){$('tex').value=k.tex||'';ctx=k.ctx||null;if(PAL[k.tab])tab=k.tab;}
+  const m=sessionStorage.getItem('jeftex.msg');if(m){sessionStorage.removeItem('jeftex.msg');say(m);}}catch(e){}
+ buildTabs();if($('tex').value)preview();
+ Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged,onSel);});
 </script></body></html>

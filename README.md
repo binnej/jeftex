@@ -1,10 +1,9 @@
 # JeFTeX: LaTeX and MathType add-in for Word
-=============================================
-<img src="logo_big.png" height="100">
-
-LaTeX and MathType add-in for Word
 
 A Word task pane that converts equations between LaTeX and MathType, with a menu bar of commonly used math constructs.
+
+> **Warning: this is a vibe-coded project.**
+> Most of the code was written with an AI assistant and has not had a thorough human code review or a full test suite. It has only been tested in a limited way, and not everything has been verified in Word with MathType (see "Tested" below). Bugs are likely. Always work on a copy of your document, check converted equations visually, and do not rely on it for important documents without verifying the result.
 
 ## Features
 
@@ -42,11 +41,31 @@ Six tabs, each with a grid of buttons showing a rendered preview:
 
 Click a button to insert its LaTeX into the text box. If you have text selected, it is placed where `§` appears in the template.
 
+### Math font
+Below the preview there is a **Font** menu. It sets the font used for the preview, the palette buttons and every newly inserted equation (the picture, and the preview picture of MathType objects).
+
+| Font | Looks like |
+|---|---|
+| MathJax TeX (classic) | the original MathJax font (default) |
+| New Computer Modern, Latin Modern | Computer Modern (LaTeX default) |
+| Termes, STIX Two | Times |
+| Pagella | Palatino |
+| Bonum | Bookman |
+| Schola | Century Schoolbook |
+| Asana | Asana Math |
+| Fira | Fira (sans-serif) |
+
+- The choice is remembered (localStorage). Changing it reloads the pane; the text box and the open tab are kept.
+- Equations already in the document keep their font until they are inserted again. The LaTeX stored in them is not changed.
+- Every font is set at the same size (1 em = 12 pt). The fonts are drawn as outlines inside the picture, so the font does not have to be installed on the reader's computer.
+- If a font cannot be loaded (for example, no internet), the pane falls back to the default font and says so.
+- The font applies to the picture only. A MathType object that you open in MathType uses MathType's own fonts.
+
 ### Rendering
 - Fractions (and binomials) are always rendered at full size, so nested fractions do not shrink. The equation simply becomes larger. Sub- and superscripts remain smaller, as is standard. The LaTeX stored in the equation is not changed, so conversion to MathType still sees `\frac`.
 - The pane header shows the logo (`logo_big.png`, served next to `taskpane.html`), at most 64 px high with the width in proportion. The ribbon button uses `icon.png`.
 - Each equation picture has a nearly invisible background rectangle with a few pixels of padding, so clicking in the white space around a formula still selects it.
-- Equations inserted before build 11 keep their old look until they are inserted again.
+- Equations inserted before build 11 keep their old look until they are inserted again. Build 12 moved to MathJax 4 and sizes equations by the em instead of the x-height, so equations in the default font are about 1.5% smaller than before.
 
 ## Installation
 
@@ -68,12 +87,12 @@ Word caches add-ins. To see a new version:
    - **Mac**: the `Wef` folder under `~/Library/Containers/com.microsoft.Word/`
 4. Reopen Word.
 
-The current build appears at the bottom of the pane ("build 11"), so you can see which version is running.
+The current build appears at the bottom of the pane ("build 12"), so you can see which version is running.
 
 ## Requirements
 
 - Word 2016 or later (Windows or Mac), or Word on the web.
-- Internet access for the external libraries (Office.js, MathJax 3.2.2 and cfb 1.2.2 from jsDelivr).
+- Internet access for the external libraries (Office.js, MathJax 4.1.3 with its font packages, and cfb 1.2.2 from jsDelivr).
 - MathType 6.x or later to edit the objects. Testing was done with `Equation.DSMT` objects.
 
 ## Support and limitations
@@ -109,7 +128,7 @@ The current build appears at the bottom of the pane ("build 11"), so you can see
 - The binary MathType format (MTEF v5) is read and written by `mtefToTex` and `texToMtef`, both included in `taskpane.html`.
 - Word's equation format (OMML) is converted by `ommlToTex`.
 - The OLE container is read and written with cfb.
-- The LaTeX preview is rendered with MathJax 3.2.2 (SVG). The PNG fallback is produced via a canvas.
+- The LaTeX preview is rendered with MathJax 4.1.3 (SVG). The font is chosen with `output.font`; the font files come from `@mathjax/mathjax-*-font`, pinned to the same version. Inline line breaking is switched off so that a formula is always one picture. The PNG fallback is produced via a canvas.
 - The manifest uses `?v=` in the URL to bypass the cache.
 
 ## Known issues
