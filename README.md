@@ -5,6 +5,8 @@ A Word task pane that converts equations between LaTeX and MathType, with a menu
 > **Warning: this is a vibe-coded project.**
 > Most of the code was written with an AI assistant and has not had a thorough human code review or a full test suite. It has only been tested in a limited way, and not everything has been verified in Word with MathType (see "Tested" below). Bugs are likely. Always work on a copy of your document, check converted equations visually, and do not rely on it for important documents without verifying the result.
 
+Human here: I use this plugin often and results are thusfar good.
+
 ## Features
 
 ### Inserting LaTeX equations
@@ -64,6 +66,8 @@ Below the preview there is a **Font** menu. It sets the font used for the previe
 ### Rendering
 - Fractions (and binomials) are always rendered at full size, so nested fractions do not shrink. The equation simply becomes larger. Sub- and superscripts remain smaller, as is standard. The LaTeX stored in the equation is not changed, so conversion to MathType still sees `\frac`.
 - The pane header shows the logo (`logo_big.png`, served next to `taskpane.html`), at most 64 px high with the width in proportion. The ribbon button uses `icon.png`.
+- Equations are vector graphics: every picture contains an SVG (smooth at any zoom, also in PDF export) plus a 300 dpi PNG (`PNGDPI` in `taskpane.html`) that Word only uses if it cannot show the SVG. To check, click an equation: with a working SVG, Word shows a **Graphics Format** tab, and you can zoom in without the shapes getting blurry. The SVG is simplified for Word (no nested `<svg>`, no MathJax accessibility metadata); it looks identical to MathJax's own output.
+- SVG pictures need Word for Microsoft 365 or Word 2019 or later. Word 2016 (non-subscription) and some Word-on-the-web situations only show the PNG.
 - Each equation picture has a nearly invisible background rectangle with a few pixels of padding, so clicking in the white space around a formula still selects it.
 - Equations inserted before build 11 keep their old look until they are inserted again. Build 12 moved to MathJax 4 and sizes equations by the em instead of the x-height, so equations in the default font are about 1.5% smaller than before.
 
@@ -87,7 +91,7 @@ Word caches add-ins. To see a new version:
    - **Mac**: the `Wef` folder under `~/Library/Containers/com.microsoft.Word/`
 4. Reopen Word.
 
-The current build appears at the bottom of the pane ("build 12"), so you can see which version is running.
+The current build appears at the bottom of the pane ("build 14"), so you can see which version is running.
 
 ## Requirements
 

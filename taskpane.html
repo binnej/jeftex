@@ -54,7 +54,7 @@ small{opacity:.6}
 <b>Word equation &rarr; LaTeX</b><br><small>Word's own equations become plugin equations</small><br>
 <button id="wa">Whole document</button>
 <p id="msg"></p>
-<small>build 12</small>
+<small>build 14</small>
 <script>
 const EMPX=16,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -67,18 +67,36 @@ const mj=async t=>{await MathJax.startup.promise;return MathJax.tex2svgPromise(t
 const b64=s=>btoa(unescape(encodeURIComponent(s)));
 
 /* ---------- LaTeX -> SVG (+PNG fallback) ---------- */
+const PNGDPI=300;  /* resolution of the PNG fallback (w and h are in 96-dpi pixels) */
 function toPng(svg,w,h){return new Promise((ok,no)=>{const i=new Image();
- i.onload=()=>{const c=document.createElement('canvas');c.width=w*3;c.height=h*3;
+ i.onload=()=>{const c=document.createElement('canvas');c.width=Math.round(w*PNGDPI/96);c.height=Math.round(h*PNGDPI/96);
   c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/png').split(',')[1]);};
  i.onerror=()=>no(new Error('PNG fallback failed'));
  i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);});}
+/* Make the SVG easy for Word's own SVG renderer: Word silently falls back to the PNG when it cannot
+   parse the SVG, and then the equation looks pixelated when zoomed. So: no nested <svg> (stretchy
+   overlines, braces, ... become <g transform> + clip-path) and no MathJax accessibility metadata. */
+function wordSvg(root){
+ const NS='http://www.w3.org/2000/svg',mk=t=>document.createElementNS(NS,t);let n=0;
+ for(const e of [...root.querySelectorAll('svg')]){
+  const x=parseFloat(e.getAttribute('x'))||0,y=parseFloat(e.getAttribute('y'))||0,w=parseFloat(e.getAttribute('width')),h=parseFloat(e.getAttribute('height')),
+   vb=(e.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number),g=mk('g'),out=mk('g'),cp=mk('clipPath'),r=mk('rect'),id='clp'+(n++);
+  if(vb.length===4&&w>0&&h>0&&vb.every(isFinite))
+   g.setAttribute('transform','translate('+x+' '+y+') scale('+w/vb[2]+' '+h/vb[3]+') translate('+(-vb[0])+' '+(-vb[1])+')');
+  else g.setAttribute('transform','translate('+x+' '+y+')');
+  while(e.firstChild)g.appendChild(e.firstChild);
+  cp.setAttribute('id',id);for(const[k,v]of[['x',x],['y',y],['width',w||0],['height',h||0]])r.setAttribute(k,v);cp.appendChild(r);
+  out.setAttribute('clip-path','url(#'+id+')');out.appendChild(g);e.replaceWith(cp,out);}
+ for(const e of [root,...root.querySelectorAll('*')]){
+  for(const a of [...e.attributes])if(/^(data-|aria-)/.test(a.name)||['role','focusable','style','interpret-as','time','pitch','rate','kind'].includes(a.name))e.removeAttribute(a.name);}
+ return root;}
 /* Fractions/binomials always in display style, so nested fractions keep full size.
    The stored TeX (alt text) is left untouched; only the rendering is adjusted. */
 const PAD=3,norm=t=>t.replace(/\\(?:frac|tfrac)(?![a-zA-Z])/g,'\\dfrac').replace(/\\binom(?![a-zA-Z])/g,'\\dbinom');
 async function render(tex){
  const n=await mj(norm(tex)),s=n.querySelector('svg');
  if(s.querySelector('[data-mml-node="merror"]'))throw new Error('Invalid LaTeX');
- vb=s.getAttribute('viewBox').split(/[\s,]+/).map(Number),
+ const vb=s.getAttribute('viewBox').split(/[\s,]+/).map(Number),
   upx=vb[2]/parseFloat(s.getAttribute('width')),  /* font units per ex: differs per font */
   K=EMPX/1000,                                    /* px per font unit: 1 em = EMPX px in every font */
   w0=vb[2]*K,h0=vb[3]*K,vaPx=(parseFloat(s.style.verticalAlign)||0)*upx*K,
@@ -91,7 +109,7 @@ async function render(tex){
  bg.setAttribute('fill','#ffffff');bg.setAttribute('fill-opacity','0.01');
  s.insertBefore(bg,s.firstChild);
  s.setAttribute('width',w+'px');s.setAttribute('height',h+'px');s.removeAttribute('style');
- const svg=new XMLSerializer().serializeToString(s).replace(/currentColor/g,'#000000');
+ const svg=new XMLSerializer().serializeToString(wordSvg(s)).replace(/currentColor/g,'#000000');
  return{svg,png:await toPng(svg,w,h),w,h,pos:Math.round((vaPx-PAD)*1.5)};
 }
 
