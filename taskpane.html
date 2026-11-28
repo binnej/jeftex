@@ -54,7 +54,7 @@ small{opacity:.6}
 <b>Word equation &rarr; LaTeX</b><br><small>Word's own equations become plugin equations</small><br>
 <button id="wa">Whole document</button>
 <p id="msg"></p>
-<small>build 14</small>
+<small>build 15</small>
 <script>
 const EMPX=16,W='http://schemas.openxmlformats.org/wordprocessingml/2006/main',
 PK='http://schemas.microsoft.com/office/2006/xmlPackage',
@@ -67,7 +67,7 @@ const mj=async t=>{await MathJax.startup.promise;return MathJax.tex2svgPromise(t
 const b64=s=>btoa(unescape(encodeURIComponent(s)));
 
 /* ---------- LaTeX -> SVG (+PNG fallback) ---------- */
-const PNGDPI=300;  /* resolution of the PNG fallback (w and h are in 96-dpi pixels) */
+const PNGDPI=600;  /* resolution of the PNG fallback (w and h are in 96-dpi pixels) */
 function toPng(svg,w,h){return new Promise((ok,no)=>{const i=new Image();
  i.onload=()=>{const c=document.createElement('canvas');c.width=Math.round(w*PNGDPI/96);c.height=Math.round(h*PNGDPI/96);
   c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/png').split(',')[1]);};
@@ -87,6 +87,10 @@ function wordSvg(root){
   while(e.firstChild)g.appendChild(e.firstChild);
   cp.setAttribute('id',id);for(const[k,v]of[['x',x],['y',y],['width',w||0],['height',h||0]])r.setAttribute(k,v);cp.appendChild(r);
   out.setAttribute('clip-path','url(#'+id+')');out.appendChild(g);e.replaceWith(cp,out);}
+ /* table rules/frames get their width from MathJax's stylesheet, which a standalone SVG does not have */
+ for(const e of root.querySelectorAll('line[data-line],rect[data-frame]')){e.setAttribute('stroke-width','70');e.setAttribute('fill','none');}
+ for(const e of root.querySelectorAll('.mjx-dashed'))e.setAttribute('stroke-dasharray','140');
+ for(const e of root.querySelectorAll('.mjx-dotted')){e.setAttribute('stroke-linecap','round');e.setAttribute('stroke-dasharray','0,140');}
  for(const e of [root,...root.querySelectorAll('*')]){
   for(const a of [...e.attributes])if(/^(data-|aria-)/.test(a.name)||['role','focusable','style','interpret-as','time','pitch','rate','kind'].includes(a.name))e.removeAttribute(a.name);}
  return root;}
@@ -340,17 +344,121 @@ const HEAD_B64='HAAAAAIAl8JDAgAAAAAAACRuPQ4NO90AhAFqCwUBAAcLRFNNVDcAARNXaW5BbGxC
 const u8=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 function oleFor(m){const c=CFB.read(u8(OLE_B64),{type:'array'}),f=CFB.find(c,'Equation Native');
  f.content=m;f.size=m.length;return CFB.write(c,{type:'base64'});}
+/* ---- EMF (vector) preview for MathType objects ------------------------------------------------
+   An OLE object in Word shows a preview picture. A PNG there is raster (pixelated in PDF/print).
+   MathType itself uses EMF, a vector format. toEmf() translates the equation SVG (paths, rects, lines,
+   transforms, clip rects) into an Enhanced Metafile. It returns base64, or null when the SVG contains
+   something it cannot translate; the caller then uses the PNG. */
+function toEmf(svgText,wpx,hpx){
+ try{
+  const doc=new DOMParser().parseFromString(svgText,'image/svg+xml'),root=doc.documentElement;
+  if(root.nodeName!=='svg'||doc.getElementsByTagName('parsererror').length)return null;
+  const vb=root.getAttribute('viewBox').trim().split(/[\s,]+/).map(Number);
+  if(vb.length!==4||!vb.every(isFinite)||!(vb[2]>0)||!(vb[3]>0))return null;
+  const Q=4,vx=vb[0],vy=vb[1],DW=Math.round(vb[2]*Q),DH=Math.round(vb[3]*Q);   /* Q: device units per SVG unit */
+  const clips={};for(const c of root.getElementsByTagName('clipPath')){const r=c.getElementsByTagName('rect')[0];if(r)clips[c.getAttribute('id')]=r;}
+  const out=[],STOCK_NULL_BRUSH=0x80000005,STOCK_NULL_PEN=0x80000008;
+  const R=(type,w)=>out.push([type,(w.length+2)*4,...w]);
+  let nh=1,selB=null,selP=null;const brushes=new Map(),pens=new Map();
+  const cc=document.createElement('canvas').getContext('2d');
+  const colour=v=>{if(!v||v==='none')return null;if(v==='currentColor')v='#000000';
+   cc.fillStyle='#000000';cc.fillStyle=v;const f=cc.fillStyle;let m;
+   if((m=/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(f)))return parseInt(m[1],16)|parseInt(m[2],16)<<8|parseInt(m[3],16)<<16;
+   if((m=/^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(f)))return (+m[1])|(+m[2])<<8|(+m[3])<<16;
+   return 0;};
+  const select=h=>{R(37,[h]);};
+  const useBrush=c=>{let h;if(c===null)h=STOCK_NULL_BRUSH;else{h=brushes.get(c);if(!h){h=nh++;brushes.set(c,h);R(39,[h,0,c,0]);}}
+   if(h!==selB){select(h);selB=h;}};
+  const usePen=(c,w)=>{let h;if(c===null)h=STOCK_NULL_PEN;else{const k=c+':'+w;h=pens.get(k);
+    if(!h){h=nh++;pens.set(k,h);R(95,[h,0,0,0,0, 0x10000|0x200,w,0,c,0,0]);}}   /* geometric, solid, flat caps */
+   if(h!==selP){select(h);selP=h;}};
+  const mul=(m,n)=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
+  const parseT=t=>{let m=[1,0,0,1,0,0],g,re=/(\w+)\s*\(([^)]*)\)/g,any=false;
+   while((g=re.exec(t))){any=true;const a=g[2].trim().split(/[\s,]+/).map(Number);let n;
+    if(g[1]==='translate')n=[1,0,0,1,a[0],a[1]||0];else if(g[1]==='scale')n=[a[0],0,0,a.length>1?a[1]:a[0],0,0];
+    else if(g[1]==='matrix'&&a.length===6)n=a;else throw new Error('transform '+g[1]);
+    if(!n.every(isFinite))throw new Error('transform value');m=mul(m,n);}
+   if(!any)throw new Error('transform');return m;};
+  const pathOps=d=>{const tk=d.match(/[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g)||[],ops=[];
+   let i=0,cmd='',x=0,y=0,sx=0,sy=0;const num=()=>{const v=parseFloat(tk[i++]);if(!isFinite(v))throw new Error('path number');return v;};
+   while(i<tk.length){if(/[A-Za-z]/.test(tk[i]))cmd=tk[i++];else if(cmd==='M')cmd='L';else if(cmd==='m')cmd='l';
+    const rel=cmd===cmd.toLowerCase(),C=cmd.toUpperCase(),ox=rel?x:0,oy=rel?y:0;
+    if(C==='M'){x=ox+num();y=oy+num();sx=x;sy=y;ops.push(['M',x,y]);}
+    else if(C==='L'){x=ox+num();y=oy+num();ops.push(['L',x,y]);}
+    else if(C==='H'){x=ox+num();ops.push(['L',x,y]);}
+    else if(C==='V'){y=oy+num();ops.push(['L',x,y]);}
+    else if(C==='C'){const a=ox+num(),b=oy+num(),c=ox+num(),e=oy+num(),f=ox+num(),g=oy+num();ops.push(['C',a,b,c,e,f,g]);x=f;y=g;}
+    else if(C==='Q'){const qx=ox+num(),qy=oy+num(),f=ox+num(),g=oy+num();
+     ops.push(['C',x+2/3*(qx-x),y+2/3*(qy-y),f+2/3*(qx-f),g+2/3*(qy-g),f,g]);x=f;y=g;}
+    else if(C==='Z'){ops.push(['Z']);x=sx;y=sy;}
+    else throw new Error('path command '+cmd);}
+   return ops;};
+  const stroke=0,emitPath=(ops,M,fillC,strokeC,sw)=>{
+   if(fillC===null&&(strokeC===null||!(sw>0)))return;
+   const T=(x,y)=>[Math.round((M[0]*x+M[2]*y+M[4]-vx)*Q),Math.round((M[1]*x+M[3]*y+M[5]-vy)*Q)];
+   const pw=Math.max(1,Math.round(Math.hypot(M[0],M[1])*Q*sw));
+   useBrush(fillC);usePen(strokeC!==null&&sw>0?strokeC:null,pw);
+   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;const bb=p=>{x0=Math.min(x0,p[0]);y0=Math.min(y0,p[1]);x1=Math.max(x1,p[0]);y1=Math.max(y1,p[1]);return p;};
+   R(59,[]);
+   for(let i=0;i<ops.length;i++){const o=ops[i];
+    if(o[0]==='M'){const p=bb(T(o[1],o[2]));R(27,p);}
+    else if(o[0]==='L'){const p=bb(T(o[1],o[2]));R(54,p);}
+    else if(o[0]==='C'){const pts=[];while(i<ops.length&&ops[i][0]==='C'){const c=ops[i];for(let k=1;k<7;k+=2)pts.push(...bb(T(c[k],c[k+1])));i++;}i--;
+     R(5,[0,0,0,0,pts.length/2,...pts]);}   /* bounds are patched below */
+    else R(61,[]);}
+   R(60,[]);
+   const bd=[x0,y0,x1,y1];
+   for(let j=out.length-1;j>=0;j--){if(out[j][0]===59)break;if(out[j][0]===5){out[j][2]=x0;out[j][3]=y0;out[j][4]=x1;out[j][5]=y1;}}
+   R(fillC!==null&&strokeC!==null&&sw>0?63:fillC!==null?62:64,bd);};
+  const rectOps=(x,y,w,h)=>[['M',x,y],['L',x+w,y],['L',x+w,y+h],['L',x,y+h],['Z']];
+  const walk=(el,M,st)=>{for(const ch of el.children){const tag=ch.localName;
+   if(['clipPath','defs','title','desc','style'].includes(tag))continue;
+   let m=M;if(ch.hasAttribute('transform'))m=mul(M,parseT(ch.getAttribute('transform')));
+   const g=n=>ch.hasAttribute(n)?ch.getAttribute(n):undefined;
+   const s={fill:g('fill')!==undefined?g('fill'):st.fill,stroke:g('stroke')!==undefined?g('stroke'):st.stroke,sw:g('stroke-width')!==undefined?parseFloat(g('stroke-width')):st.sw};
+   if(g('stroke-dasharray')!==undefined||g('stroke-linecap')==='round'||g('opacity')!==undefined||g('mask')!==undefined||g('filter')!==undefined)throw new Error('style');
+   let clip=null;const cp=g('clip-path');
+   if(cp){const id=(/url\(#([^)]+)\)/.exec(cp)||[])[1],r=clips[id];if(!r||m[1]||m[2])throw new Error('clip');
+    const a=[+r.getAttribute('x')||0,+r.getAttribute('y')||0,+r.getAttribute('width'),+r.getAttribute('height')],
+     p1=[(m[0]*a[0]+m[4]-vx)*Q,(m[3]*a[1]+m[5]-vy)*Q],p2=[(m[0]*(a[0]+a[2])+m[4]-vx)*Q,(m[3]*(a[1]+a[3])+m[5]-vy)*Q];
+    clip=[Math.round(Math.min(p1[0],p2[0])),Math.round(Math.min(p1[1],p2[1])),Math.round(Math.max(p1[0],p2[0])),Math.round(Math.max(p1[1],p2[1]))];
+    R(33,[]);R(30,clip);}
+   const sB=selB,sP=selP;
+   if(tag==='g')walk(ch,m,s);
+   else if(tag==='path')emitPath(pathOps(g('d')||''),m,colour(s.fill),colour(s.stroke),s.sw);
+   else if(tag==='rect'){
+    const fo=parseFloat(g('fill-opacity'));
+    if(g('rx')!==undefined||g('ry')!==undefined)throw new Error('rounded rect');
+    if(!(fo<=0.1))emitPath(rectOps(+g('x')||0,+g('y')||0,+g('width'),+g('height')),m,colour(s.fill),colour(s.stroke),s.sw);}
+   else if(tag==='line')emitPath([['M',+g('x1'),+g('y1')],['L',+g('x2'),+g('y2')]],m,null,colour(s.stroke),s.sw);
+   else throw new Error('element '+tag);
+   if(clip){R(34,[-1]);selB=sB;selP=sP;}}};
+  R(19,[2]);   /* winding fill, like SVG's default */
+  walk(root,[1,0,0,1,0,0],{fill:'#000000',stroke:'none',sw:0});
+  R(14,[0,16,20]);
+  const nrec=out.length+1;let bytes=108;for(const r of out)bytes+=r[1];
+  const buf=new ArrayBuffer(bytes),dv=new DataView(buf),W=wpx/96,H=hpx/96;let o=0;const w=v=>{dv.setInt32(o,v,true);o+=4;};
+  [1,108,0,0,DW-1,DH-1,0,0,Math.round(W*2540),Math.round(H*2540),0x464D4520,0x10000,bytes,nrec].forEach(w);
+  dv.setUint16(o,nh,true);dv.setUint16(o+2,0,true);o+=4;
+  [0,0,0,DW,DH,Math.round(W*25.4),Math.round(H*25.4),0,0,0,Math.round(W*25400),Math.round(H*25400)].forEach(w);
+  for(const r of out)for(const v of r)w(v);
+  const u=new Uint8Array(buf);let bin='';for(let i=0;i<u.length;i+=8192)bin+=String.fromCharCode.apply(null,u.subarray(i,i+8192));
+  return btoa(bin);
+ }catch(e){console.warn('EMF preview not possible, using PNG:',e.message);return null;}
+}
+/* picture for a MathType object: EMF (vector) when possible, otherwise the PNG */
+const mtImage=(r,name)=>{const e=toEmf(r.svg,r.w,r.h);return e?{file:name+'.emf',ct:'image/x-emf',data:e}:{file:name+'.png',ct:'image/png',data:r.png};};
 function objXml(w,h,id,rp,ro){
  return `<w:object xmlns:w="${W}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:r="${RT}" w:dxaOrig="${Math.round(w*15)}" w:dyaOrig="${Math.round(h*15)}"><v:shape id="_x0000_i${id}" type="#_x0000_t75" style="width:${(w*.75).toFixed(2)}pt;height:${(h*.75).toFixed(2)}pt" o:ole=""><v:imagedata r:id="${rp}" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="Equation.DSMT4" ShapeID="_x0000_i${id}" DrawAspect="Content" ObjectID="_${id}${Math.floor(Math.random()*1e6)}" r:id="${ro}"/></w:object>`;}
 function pkgMT(r,tex){
- const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),id=Date.now()%1e6,
- rels=`<Relationships xmlns="${PR}"><Relationship Id="rIdP" Type="${RT}/image" Target="media/eqm.png"/><Relationship Id="rIdO" Type="${RT}/oleObject" Target="embeddings/eqm.bin"/></Relationships>`,
+ const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),id=Date.now()%1e6,im=mtImage(r,'eqm'),
+ rels=`<Relationships xmlns="${PR}"><Relationship Id="rIdP" Type="${RT}/image" Target="media/${im.file}"/><Relationship Id="rIdO" Type="${RT}/oleObject" Target="embeddings/eqm.bin"/></Relationships>`,
  run=`<w:r>${r.pos?`<w:rPr><w:position w:val="${r.pos}"/></w:rPr>`:''}${objXml(r.w,r.h,id,'rIdP','rIdO')}</w:r>`;
  return `<pkg:package xmlns:pkg="${PK}">`
   +part('/_rels/.rels','application/vnd.openxmlformats-package.relationships+xml',`<Relationships xmlns="${PR}"><Relationship Id="rId1" Type="${RT}/officeDocument" Target="word/document.xml"/></Relationships>`)
   +part('/word/_rels/document.xml.rels','application/vnd.openxmlformats-package.relationships+xml',rels)
   +part('/word/document.xml','application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',`<w:document xmlns:w="${W}"><w:body><w:p>${run}</w:p></w:body></w:document>`)
-  +part('/word/media/eqm.png','image/png',r.png,1)+part('/word/embeddings/eqm.bin',OLE_CT,ole,1)+'</pkg:package>';}
+  +part('/word/media/'+im.file,im.ct,im.data,1)+part('/word/embeddings/eqm.bin',OLE_CT,ole,1)+'</pkg:package>';}
 /* plugin equations (pictures with TEX: alt text) inside an OOXML package -> MathType objects */
 async function toMathType(x){
  const d=new DOMParser().parseFromString(x,'application/xml'),P={};
@@ -360,14 +468,14 @@ async function toMathType(x){
  let n=0;const errs=[],id0=Date.now()%1e6;
  if(!dps.length)errs.push('no plugin equations found in the selection');
  for(const dp of dps){const tex=dp.getAttribute('descr').slice(4);
-  try{const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),r=await render(tex),k=n;
+  try{const m=texToMtef(tex,u8(HEAD_B64)),ole=oleFor(m),r=await render(tex),k=n,im=mtImage(r,`eqm${k}`);
    let dr=dp;while(dr&&dr.nodeName!=='w:drawing')dr=dr.parentNode;
    const ob=d.importNode(new DOMParser().parseFromString(objXml(r.w,r.h,id0+k,'rIdMP'+k,'rIdMO'+k),'application/xml').documentElement,true);
    dr.parentNode.replaceChild(ob,dr);
-   for(const[idn,ty,tg]of[['rIdMP'+k,'image',`media/eqm${k}.png`],['rIdMO'+k,'oleObject',`embeddings/eqm${k}.bin`]]){
+   for(const[idn,ty,tg]of[['rIdMP'+k,'image','media/'+im.file],['rIdMO'+k,'oleObject',`embeddings/eqm${k}.bin`]]){
     const e=d.createElementNS(rel.namespaceURI,'Relationship');
     e.setAttribute('Id',idn);e.setAttribute('Type',RT+'/'+ty);e.setAttribute('Target',tg);rel.appendChild(e);}
-   const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">`+part(`/word/media/eqm${k}.png`,'image/png',r.png,1)+part(`/word/embeddings/eqm${k}.bin`,OLE_CT,ole,1)+'</pkg:package>','application/xml');
+   const add=new DOMParser().parseFromString(`<pkg:package xmlns:pkg="${PK}">`+part('/word/media/'+im.file,im.ct,im.data,1)+part(`/word/embeddings/eqm${k}.bin`,OLE_CT,ole,1)+'</pkg:package>','application/xml');
    for(const c of [...add.documentElement.children])d.documentElement.appendChild(d.importNode(c,true));
    n++;
   }catch(e){errs.push(e.message+' ['+tex.slice(0,40)+']');}}
