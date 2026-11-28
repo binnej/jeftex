@@ -5,7 +5,7 @@ A Word task pane that converts equations between LaTeX and MathType, with a menu
 > **Warning: this is a vibe-coded project.**
 > Most of the code was written with an AI assistant and has not had a thorough human code review or a full test suite. It has only been tested in a limited way, and not everything has been verified in Word with MathType (see "Tested" below). Bugs are likely. Always work on a copy of your document, check converted equations visually, and do not rely on it for important documents without verifying the result.
 
-Human here: in my experience, it works pretty well. Cheers!
+Human here: I use this plugin often and results are thusfar good.
 
 ## Features
 
@@ -72,6 +72,11 @@ Below the preview there is a **Font** menu. It sets the font used for the previe
 - Equations inserted before build 11 keep their old look until they are inserted again. Build 12 moved to MathJax 4 and sizes equations by the em instead of the x-height, so equations in the default font are about 1.5% smaller than before.
 
 ## Installation
+
+### Easy install on Windows
+Download the `windows-installer` folder and double-click **Install-JeFTeX.bat**. It copies (or downloads) `manifest.xml`, shares its folder (one administrator prompt), adds it as a trusted add-in catalog for your user, and clears Word's add-in cache. Then open Word: **Insert > Add-ins > My Add-ins > Shared Folder > JeFTeX**. Run the installer again after an update. **Uninstall-JeFTeX.bat** removes everything. The scripts are plain text, so you can read them first. They have not been tested on every Windows and Office version; if they fail, use the manual steps below.
+
+### Manual install
 
 1. Host `taskpane.html` at an HTTPS address. In this project that is GitHub Pages: `https://binnej.github.io/jeftex/taskpane.html`.
 2. In `manifest.xml`, set the `SourceLocation` and the `bt:Url` entries to that address.
